@@ -1,0 +1,62 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\PackageController;
+use App\Http\Controllers\MaterialController;
+use App\Http\Controllers\materialstockController;
+use App\Http\Controllers\materialstoreController;
+use App\Http\Controllers\StuffController;
+use App\Http\Controllers\MaterialOutsideController;
+use App\Http\Controllers\ManufactureController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\OrdershippedController;
+use App\Http\Controllers\StockfabricController;
+use App\Http\Controllers\FabricoutController;
+use App\Http\Controllers\FabricdepositController;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
+Route::get('/', function () {
+    return view('welcome');
+});
+
+Auth::routes();
+
+Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+
+Route::resource('employee', EmployeeController::class );
+
+Route::resource('customer', CustomerController::class );
+
+Route::resource('order', OrderController::class );
+
+Route::resource('supplier', SupplierController::class );
+
+Route::resource('package', PackageController::class );
+Route::resource('material', MaterialController::class );
+Route::resource('materialstock', materialstockController::class );
+Route::resource('materialstore', materialstoreController::class );
+Route::resource('stuff', StuffController::class );
+Route::resource('materialoutside', MaterialOutsideController::class );
+Route::resource('manufacture', ManufactureController::class );
+Route::resource('inventory', InventoryController::class );
+Route::resource('ordershipped', OrdershippedController::class );
+Route::resource('stockfabric', StockfabricController::class );
+Route::resource('fabricout', FabricoutController::class );
+Route::resource('fabricdeposit', FabricdepositController::class );
+
+Route::post('generate-pdf', 'PDFController@generatePDF')->name('generate-pdf');
+

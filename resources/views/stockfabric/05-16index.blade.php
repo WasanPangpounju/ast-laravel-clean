@@ -1,0 +1,211 @@
+@extends('layouts.astmanufacturing')
+
+@section('content')
+    <!-- Content Wrapper. Contains page content -->
+    <div class="content-wrapper">
+        <div class="">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/home">หน้าหลัก</a>
+                </li>
+                <li class="breadcrumb-item"><a href="/stockfabric/">คลังสินค้า</a>
+                </li>
+                <li class="breadcrumb-item active">รายการสินค้าคงคลัง</li>
+            </ol>
+        </div>
+        <!-- Content Header (Page header) -->
+        <div class="content-header">
+            <div class="container-fluid">
+                <div class="row mb-2">
+                    <h1 class="m-0"><i class="nav-icon fas fa fa-arrow-circle-right"></i> รายการสินค้าคงคลัง</h1>
+                </div>
+            </div>
+        </div>
+        <!-- Main content -->
+        <div class="content">
+            <div class="box-from">
+                <h2 class="title"><i class="fa fa-caret-right"></i> รายการผ้าผลิตแล้วในสต๊อก</h2>
+                <div class="container">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <button class="btn b_order" type="button" style="width: 50%;margin:0.5rem;background-color: #ebd575;"><a
+                                    href="{{ route('inventory.index') }}">รายการสินค้าสั่งผลิต</a></button>
+                            <button class="btn b_order" type="button" style="width: 50%;margin:0.5rem;background-color: #aca06e;"><a
+                                    href="{{ route('fabricout.index') }}">รายการสินค้าคงคลัง</a></button>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn b_order" type="button" style="width: 50%;margin:0.5rem;background-color: #1bccbd;"><a
+                                    href="{{ route('inventory.create') }}">บันทึกรายการสินค้า
+                                </a></button>
+                            <button class="btn b_order" type="button" style="width: 50%;margin:0.5rem;background-color: #8a8a8a;"><a
+                                    href="{{ route('fabricout.create') }}">บันทึกรายการจัดส่งสินค้า</a></button>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn b_order" type="button" style="width: 55%;margin:0.5rem;background-color: #ec9c06;"><a
+                                    href="{{ route('stockfabric.index') }}">รายการผ้าผลิตแล้วในสต๊อก</a></button>
+                            <button class="btn b_order" type="button" style="width: 55%;margin:0.5rem;background-color: rgb(175, 163, 110);"><a
+                                    href="{{ route('fabricdeposit.index') }}">รายการผ้าผลิตฝากจัดเก็บ</a></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-2"></div>
+                    <div class="col-6 table-responsive">
+                        <table class="table table-bordered table-a" style="width:100%">
+                            <thead style="position: sticky;top: 0">
+                                <tr>
+                                    <th>โครงสร้างผ้า </th>
+                                    <th>ลายผ้า </th>
+                                    <th>หน้ากว้าง</th>
+                                    <th>จำนวนพับ </th>
+                                    <th>จำนวนหลา</th>
+                                </tr>
+                            <tbody style="text-align: right;">
+                                <?php
+                                    $c = $sumStockfabric->count();
+                                ?>
+                                @for ($i = 0; $i < $c; $i++)
+                                    <tr>
+                                        <td>{{ $sumStockfabric[$i]->fabricStruct }}</td>
+                                        <td>{{ $sumStockfabric[$i]->fabricPattern }}</td>
+                                        <td>{{ $sumStockfabric[$i]->fabricW }}</td>
+                                        <td>{{ $sumStockfabric[$i]->foldCount }}</td>
+                                        <td>{{ $sumStockfabric[$i]->sumYardSum }}</td>
+                                    </tr>
+                                @endfor
+                            </tbody>
+                            </thead>
+                        </table>
+                    </div>
+                    {{-- ผ้า {{ $sumStockfabric[0]->fabricStruct }}
+                <br> หน้ากว้าง
+                {{ $sumStockfabric[0]->fabricW }}
+                <br> จำนวนพับ
+                {{ $sumStockfabric[0]->foldCount }}
+                <br> จำนวนหลา
+                {{ $sumStockfabric[0]->sumYardSum }} --}}
+
+                </div>
+            </div>
+            <!--box-from-->
+        </div>
+        <!--content-->
+    </div> <!-- /.content-wrapper -->
+    <script>
+        function yd(valNum) {
+            var m = (valNum * 0.9144).toFixed(4);
+            document.getElementById('sumM').value = m;
+        }
+
+        function ydToM(valNum) {
+            var yd = (valNum / 0.9144).toFixed(4);
+            document.getElementById('sumYard').value = yd;
+        }
+
+        function pToYd(valNum) {
+            var orderyd = document.getElementById('orderSumYard').value;
+            let ordernum = parseInt(orderyd);
+            var sppYd = ((orderyd * (valNum / 100)) + ordernum).toFixed(4);
+            document.getElementById('fabricSpy').value = sppYd;
+        }
+
+        function ydToP(valNum) {
+            var orderp = document.getElementById('orderSumYard').value;
+            var sppP = (orderp / valNum).toFixed(4);
+            document.getElementById('fabricSPY').value = sppP;
+        }
+
+        function priceToM(valNum) {
+            var orderp = document.getElementById('orderSumM').value;
+            var sumPriceP = orderp * valNum;
+            var pyd = (sumPriceP / (orderp * 0.9144)).toFixed(2);
+
+            /*                var orderyd = document.getElementById('orderSumYard').value;
+                            var sumPriceYd = orderyd * valNum;
+                            var pm = (sumPriceYd / (orderyd / 0.9144)).toFixed(2);
+                            */
+            document.getElementById('priceM').value = pyd;
+
+        }
+
+        function priceToY(valNum) {
+            var orderyd = document.getElementById('orderSumYard').value;
+            var sumPriceYd = orderyd * valNum;
+            var pm = (sumPriceYd / (orderyd / 0.9144)).toFixed(2);
+
+            /*                var orderp = document.getElementById('orderSumM').value;
+                            var sumPriceP = orderp * valNum;
+                            var pyd = (sumPriceP / (orderp * 0.9144)).toFixed(2);
+                            */
+            document.getElementById('priceYard').value = pm;
+
+        }
+
+        function discountToPriceYd(valNum) {
+            var pyd = document.getElementById('priceYard').value;
+            var discountYd = ((pyd * valNum) / 100).toFixed(2);
+            document.getElementById('discountYard').value = discountYd;
+        }
+
+        function discountToPriceP(valNum) {
+            var pyd = document.getElementById('priceYard').value;
+            var discountP = ((valNum * 100) / pyd).toFixed(2);
+            document.getElementById('discountP').value = discountP;
+        }
+    </script>
+
+    <script>
+        var input, filter, ul, li, a, i, txtValue;
+
+        ul = document.getElementById("supp");
+        li = ul.getElementsByTagName("li");
+        //alert(li.length);
+
+        for (i = 0; i < li.length; i++) {
+            li[i].style.display = "none";
+        }
+    </script>
+
+    <script>
+        function supplierFunction(id) {
+            var input, filter, ul, li, a, i, txtValue;
+
+            input = document.getElementById('orderId');
+            filter = input.value.toUpperCase();
+            ul = document.getElementById("supp");
+            li = ul.getElementsByTagName("li");
+            for (i = 0; i < li.length; i++) {
+                if (filter == "") {
+                    for (i = 0; i < li.length; i++) {
+                        li[i].style.display = "none";
+                    }
+                    break;
+                }
+
+                a = li[i].getElementsByTagName("a")[0];
+                txtValue = a.textContent || a.innerText;
+                if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                    li[i].style.display = "";
+                } else {
+                    li[i].style.display = "none";
+                }
+            }
+        }
+
+
+        function setOrderIdFunction(t, t1, t2, t3, t4) {
+            document.getElementById("orderId").value = t1;
+            document.getElementById("fabricId").value = t2;
+            document.getElementById("fabricStruct").value = t3;
+            document.getElementById("refId").value = t4;
+
+            ul = document.getElementById('supp');
+            //ul.style.display = "none";  
+            li = ul.getElementsByTagName("li");
+
+            for (i = 0; i < li.length; i++) {
+                li[i].style.display = "none";
+            }
+
+        }
+    </script>
+@endsection

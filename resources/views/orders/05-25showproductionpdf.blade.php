@@ -1,0 +1,352 @@
+<?php
+//set value to Surcharge
+$surcharge = $fabricStructureData['yarnWRatio4'];
+$sovat = $fabricStructureData['vat'];
+?>
+
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>ASIA TEXTILE CO., LTD.</title>
+    <meta name="viewport"
+        content="width=device-width,user-scalable=yes,initial-scale=1, maximum-scale=1, minimum-scale=1">
+
+    <link rel="stylesheet" type="text/css" href="<?php echo asset('assets/css/adminlte.css'); ?>">
+    <link rel="stylesheet" type="text/css" href="<?php echo asset('assets/css/stylesheet.css'); ?>">
+    <!-- Bootstrap Color Picker -->
+    <link rel="stylesheet" href="<?php echo asset('assets/css/bootstrap-colorpicker.min.css'); ?>">
+    <!-- Tempusdominus Bootstrap 4 -->
+    <link rel="stylesheet" href="<?php echo asset('assets/css/tempusdominus-bootstrap-4.min.css'); ?>">
+    <link rel="stylesheet" href="<?php echo asset('assets/fonts/fontawesome-free/css/all.min.css'); ?>">
+    <link rel="icon" href="<?php echo asset('assets/images/favicon.png'); ?>" type="image" sizes="16x16">
+    <style>
+        @media print {
+            @page {
+                size: 9in 5.5in;
+                margin: 0;
+            }
+            /* body {
+                margin: 0;
+                font-size: 14pt;
+            }
+        } */
+    </style>
+</head>
+<style>
+    /* #bath {
+        text-align: right;
+        color: blue;
+    } */
+</style>
+
+<body class="hold-transition sidebar-mini" onload="printPdf()">
+
+    <div class="content">
+        <div class="inner_content">
+            {{-- <div class="row">
+                <div class="col-md-2">
+                    @if ($showproduction->vat != 'SOB')
+                        <figure><img src="<?php echo asset('assets/images/logo-blue.png'); ?>" width="100"></figure>
+                    @else
+                        <h1>AST</h1>
+                    @endif
+                </div>
+                <div class="col-md-10">
+                    <div class="clr">
+                        <div class="company-name">
+                            @if ($showproduction->vat != 'SOB')
+                                <h1>บริษัท เอเซียเท็กซ์ไทล์ จำกัด</h1>
+                                <p>ASIA TEXTILE CO., LTD.</p>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="address-company">
+                        @if ($showproduction->vat != 'SOB')
+                            <p>789 หมู่ที่ 2 ซอยบางเมฆขาว ถนนสุขุมวิท ตำบลท้ายบ้าน อำเภอเมืองสมุทปราการ
+                                จังหวัดสมุทรปราการ 10280</p>
+                            <p>เบอร์โทรศัพท์ : 0-2389-2281-3 Email : asiatestile@gmail.com</p>
+                            <p>เลขประจำตัวผู้เสียภาษี : 0115531002270</p>
+                        @endif
+                    </div>
+
+                </div>
+            </div> --}}
+            <div class="address-company" style="text-align: center;margin-top:2.5em;">
+                <h2>ใบสั่งผลิต</h2>
+            </div>
+            <div class="purchase_order_info">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>ชื่อลูกค้า </strong>
+                            </div>
+                            <div class="col-md-6">
+                                {{ $showproduction->customerName }}
+                            </div>
+                        </div>
+
+                        <?php
+                        //Get Customer data
+                        $customerData = App\Http\Controllers\OrderController::customerData($showproduction->customerName);
+                        ?>
+
+                        {{-- <div class="row">
+                            <div class="col-md-6">
+                                <strong>ที่อยู่</strong>
+                            </div>
+                            <div class="col-md-6">
+                                {{ $customerData[0]->address }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>เลขประจำตัวผู้เสียภาษี </strong>
+                            </div>
+                            <div class="col-md-6">
+                                {{ $customerData[0]->tax }}
+                            </div>
+                        </div> --}}
+
+                        {{-- <div class="row">
+                            <div class="col-md-6">
+                                <strong>ผู้ประสานงาน</strong>
+                            </div>
+                            <div class="col-md-6">
+                                {{ $showproduction->coname }}
+                            </div>
+                        </div> --}}
+                    </div>
+                    <div class="col-md-6">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>เลขที่ใบสั่งผลิต</strong>
+                            </div>
+                            <div class="col-md-6">
+                                {{ $showproduction->purchaseOrder }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong> วันที่ </strong>
+                            </div>
+                            <div class="col-md-6">
+                                <?php echo date('d/m/Y', strtotime($showproduction->createDate)); ?>
+                            </div>
+                        </div>
+                        {{-- <div class="row">
+                            <div class="col-md-6">
+                                <strong> เงื่อนไขการชำระเงิน</strong>
+                            </div>
+                            <div class="col-md-6">
+                                {{ $showproduction->payment }}
+                            </div>
+                        </div> --}}
+                    </div>
+                </div>
+                <!--row-->
+            </div>
+            <div class="purchase_order_info">
+                <div class="detail" style="font-size: 1.05rem">
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-5 table-responsive">
+                            <b>โครงสร้างผ้า : </b> <ins>{{ $showproduction->s1 }}</ins><br>
+                            <b style="margin-right: 6rem"></b>{{ $showproduction->s2 }}<br><br>
+                        </div>
+                        <div class="col-3 table-responsive">
+                            <b>หน้าผ้ากว้าง : </b> {{ $showproduction->fabric_w }} นิ้ว<br><br>
+
+                        </div>
+                        <div class="col-2 table-responsive">
+                            <b> ลายผ้า </b>
+                            @if ($showproduction->yarnHRatio1 != 'no data')
+                                {{ $showproduction->yarnHRatio1 }}
+                            @endif <?php echo preg_replace('/\([^)]+\)/', '', $showproduction->fabricPattern); ?>
+                            <br><br>
+                            <b>รหัสผ้า </b> {{ $showproduction->fabricId }}<br><br>
+                        </div>
+                    </div>
+                    <!--row-->
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-5 table-responsive">
+                            <b>จำนวนด้ายยืน : </b> {{ $showproduction->yarn_h_count }}<br><br>
+
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-5 table-responsive">
+                            <b>ชนิดด้ายยืน : </b> {{ $showproduction->yarnHType1 }}<br><br>
+                        </div>
+                        <div class="col-4 table-responsive"><b>บริษัท : </b>
+                            <?php $subNameH1 = str_replace('บริษัท', '', $showproduction->subNameH1); ?>
+                            {{ $subNameH1 }}<br><br></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-5 table-responsive">
+                            <b>ชนิดด้ายพุ่ง : </b> {{ $showproduction->yarnWType1 }}<br><br>
+                        </div>
+                        <div class="col-4 table-responsive"><b>บริษัท : </b>
+                            <?php $subNameW1 = str_replace('บริษัท', '', $showproduction->subNameW1); ?>
+                            {{ $subNameW1 }}<br><br></div>
+                    </div>
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-4 table-responsive">
+                            <b>จำนวนด้ายพุ่ง : </b> {{ $showproduction->yarnWCount1 }}<br><br>
+
+                        </div>
+                        <div class="col-4 table-responsive">
+                            {{-- <b>หน้าผ้ากว้าง : </b> {{ $showproduction->fabric_w }} นิ้ว<br><br> --}}
+
+                        </div>
+                        <div class="col-2 table-responsive">
+                            <b>สืบ : </b> <br><br>
+
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-4 table-responsive">
+                            <b>ฟันหวีเบอร์ : </b> {{ $showproduction->phewNumber }}<br><br>
+
+                        </div>
+                        <div class="col-4 table-responsive">
+                            <b>หน้าหวีกว้าง : </b> {{ $showproduction->phewW }} นิ้ว<br><br>
+
+                        </div>
+                        <div class="col-2 table-responsive">
+                            <b>ไซร์ : </b> <br><br>
+
+                        </div>
+                    </div>
+                    <!--row-->
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-4 table-responsive">
+                            {{-- <b>พ่นสีลงผ้า : </b> {{ $showproduction->vat }}<br><br> --}}
+                            <b>พ่นสีลงผ้า : </b>  {{ $showproduction->vat }}<br><br>
+
+                        </div>
+
+                    </div>
+                    <!--row-->
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-5 table-responsive">
+                            @if ($showproduction->typrtag == 'm')
+                                {{-- {{ $orderdata->fabricSPY * ($orderdata->orderSumYard / 100) + $orderdata->orderSumYard }}
+                                <b>หลา</b>
+                                {{ $orderdata->fabricSPY * ($orderdata->orderSumM / 100) + $orderdata->orderSumM }}
+                                <b>เมตร</b> --}}
+                                <b>ออร์เดอร์สืบ :
+                                </b>{{ $showproduction->fabricSPY * ($showproduction->orderSumM / 100) + $showproduction->orderSumM }}
+                                เมตร<br><br>
+                            @else
+                                <b>ออร์เดอร์สืบ :
+                                </b>{{ $showproduction->fabricSPY * ($showproduction->orderSumYard / 100) + $showproduction->orderSumYard }}
+                                หลา<br><br>
+                            @endif
+                        </div>
+                        <div class="col-5 table-responsive">
+                            <b>กำหนดส่ง : </b> <br> <br>
+                        </div>
+                    </div>
+                    <!--row-->
+                    <div class="row">
+                        <div class="col-2 table-responsive"></div>
+                        <div class="col-5 table-responsive">
+                            <b>ชนิดเครื่องทอ : </b> {{ $showproduction->typemachine }}<br> <br>
+                        </div>
+                        <div class="col-5 table-responsive">
+                            <b>เบอร์เครื่อง : </b> {{ $showproduction->machinenumber }}<br> <br>
+                        </div>
+                    </div>
+                    <!--row-->
+                </div>
+            </div>
+            <div class="purchase_order_info">
+                <div class="row">
+                    <div class="col-md-7">
+                        <div class="row">
+                            <div class="col-md-2">
+                                <strong>หมายเหตุ</strong>
+                            </div>
+                            <div class="col-md-10">
+                                @if ($showproduction->comment != 'no data')
+                                    {{ $showproduction->comment }}
+                                @endif
+                                @if ($showproduction->vat == 'SOX')
+                                    <strong> ราคานี้รวม VAT แล้ว</strong><br>
+                                @endif
+                                @if ($showproduction->po != 'no data')
+                                    {{ $showproduction->po }}
+                                @endif
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!--row-->
+            </div>
+            <!--purchase_order_info-->
+            <div class="purchase_order_signature">
+                <div class="row">
+                    <div class="col-md-6 mt-5">
+                        <div class="box_signature">
+                            <div class="inner_signature">
+                                {{-- {{ $showproduction->coname }} --}}
+                            </div>
+                            <p><strong>ผู้สั่งงาน</strong></p>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mt-5">
+                        <div class="box_signature">
+                            <div class="inner_signature">
+                                {{-- {{ $showproduction->emp }} --}}
+                            </div>
+                            <p><strong>ผู้ตรวจสอบ </strong></p>
+                        </div>
+                    </div>
+                </div>
+                <!--row-->
+            </div>
+            <!--purchase_order_signature-->
+            <div class="purchase_order_signature">
+                <div class="row">
+                    <div class="col-md-8" style="margin-left:23em;">
+
+                    </div>
+                </div>
+                <!--row-->
+            </div>
+            <!--purchase_order_signature-->
+            <div class="purchase_order_signature">
+                <div class="row">
+                    <div class="col-md-8" style="margin-left:18em;">
+                    </div>
+                </div>
+                <!--row-->
+            </div>
+            <!--purchase_order_signature-->
+        </div>
+        <!--inner_content-->
+    </div>
+    <!--content-->
+
+    <script>
+        function printPdf() {
+            // Set the page size to 9x5.5 inches
+            document.body.style.width = '9in';
+            document.body.style.height = '5.5in';
+            window.print();
+        }
+    </script>
+</body>
+
+</html>
