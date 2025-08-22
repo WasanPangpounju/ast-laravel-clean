@@ -521,6 +521,8 @@
                                                         value="{{ $withorders1->customerName }}                                                        ">
                                                     <input type="hidden" name="fabricStruct"
                                                         value="{{ $withorders1->fabricStructure }}">
+                                                    <input type="hidden" name="purchaseOrder"
+                                                        value="{{ $withorders1->purchaseOrder }}">
 
 
                                                     <button name="submit" value="generateByOrder"
