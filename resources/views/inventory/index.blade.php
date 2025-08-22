@@ -466,7 +466,7 @@
                                                 {{-- id', 'customerName', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder --}}
                                             </td>
                                             {{-- <td>{{ $withorders1->id }}::{{ $inventorySum->refId }}</td> --}}
-                                            <td>SO: {{ $withorders1->purchaseOrder }} / {{ $withorders1->customerName }}</td>
+                                            <td>{{ $withorders1->purchaseOrder }} / {{ $withorders1->customerName }}</td>
                                             <td>{{ $withorders1->fabricId }}</td>
                                             <td>{{ $withorders1->fabricStructure }}</td>
                                             <td>{{ $withorders1->fabricPattern }}</td>
