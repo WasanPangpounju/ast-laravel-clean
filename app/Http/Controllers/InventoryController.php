@@ -42,7 +42,7 @@ class InventoryController extends Controller
         // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
         $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
 
-        $orders = AstPurchaseorder::select('id', 'po' , 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
+        $orders = AstPurchaseorder::select('id', 'purchaseOrder' , 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
             ->whereIn('id', $ecp)
             // ->orderBy('created_at', 'desc')
             ->orderBy('createDate', 'desc')
