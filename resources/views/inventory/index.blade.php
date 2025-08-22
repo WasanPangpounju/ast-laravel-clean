@@ -361,7 +361,7 @@
                                 <thead style="position: sticky;top: 0">
                                     <tr>
                                         <th rowspan="2">วันที่ </th>
-                                        <th rowspan="2">ลูกค้า </th>
+                                        <th rowspan="2">po /  ลูกค้า </th>
                                         <th rowspan="2">รหัสผ้า</th>
                                         <th rowspan="2">โครงสร้างผ้า</th>
                                         <th rowspan="2">ลายผ้า</th>
@@ -392,7 +392,7 @@
                                                         {{-- id', 'customerName', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder --}}
                                                     </td>
                                                     {{-- <td>{{ $withorders1->id }}::{{ $inventorySum->refId }}</td> --}}
-                                                    <td>po: {{ $withorders1->customerName }}</td>
+                                                    <td>{{ $withorders1->customerName }}</td>
                                                     <td>{{ $withorders1->fabricId }}</td>
                                                     <td>{{ $withorders1->fabricStructure }}</td>
                                                     <td>{{ $withorders1->fabricPattern }}</td>
