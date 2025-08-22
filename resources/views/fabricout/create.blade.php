@@ -76,7 +76,18 @@
         $realVatType = empty($vatType) ? ($vatNoxParts[0] ?? '') : $vatType;
     @endphp
 
-    <input type="hidden" id="vatNo1" name="vatNo" value="{{ $realVatNo }}">
+    <label for="vatNo1" class="d-block mt-2">เลขที่บิล</label>
+<input
+  type="number"
+  id="vatNo1"
+  name="vatNo"
+  class="form-control"
+  style="max-width:200px"
+  value="{{ $realVatNo }}"
+  min="0" step="1"
+>
+
+    <!-- <input type="hidden" id="vatNo1" name="vatNo" value="{{ $realVatNo }}"> -->
     <input type="hidden" id="vatType1" name="vatType" value="{{ $realVatType }}">
     <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
 
