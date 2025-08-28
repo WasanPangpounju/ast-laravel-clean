@@ -187,8 +187,8 @@ class OrderController extends Controller
             // $searchInput = '';
             // $select_searchfill = '';
             // $Oldsearch = '';
-            if ($request->filled('submit') && $request->submit == 'searchImport') {
-    $select_search     = '';
+
+            search     = '';
     $searchInput       = '';
     $select_searchfill = '';
     $Oldsearch         = '';
