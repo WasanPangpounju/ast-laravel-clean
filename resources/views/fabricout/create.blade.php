@@ -334,7 +334,7 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
 
                                 <input type="hidden" name="orderId" class="form-control" value="<?php print $order_id; ?>">
                                 <div class="form-group">
-                                      <label for="vatNo1" class="d-block mt-2">เลขที่บิล</label>
+                                      <label for="vatNo1" class="d-block mt-2">เลขที่บิลxxx</label>
                                             <input
                                             type="text"
                                             id="vatNo1"
