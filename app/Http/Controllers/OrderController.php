@@ -187,95 +187,116 @@ class OrderController extends Controller
             $searchInput = '';
             $select_searchfill = '';
             $Oldsearch = '';
+        // === คงตัวแปรที่ view ใช้อยู่เดิม ===
+        $select_search     = '';
+        $searchInput       = '';
+        $select_searchfill = '';
+        $Oldsearch         = '';
 
-                if (! $request->filled('submit') || $request->submit !== 'searchImport') {
-        abort(400, 'Invalid submit');
-    }
+        // === Validation เบื้องต้นกันอินพุตเพี้ยน โดยเฉพาะวันที่ ===
+        $request->validate([
+            'importId'      => ['nullable','string'],
+            'customerName'  => ['nullable','string'],
+            'imDate'        => ['nullable','date_format:d/m/Y'],
+            'yarnHType1'    => ['nullable','string'],
+            'yarnWType1'    => ['nullable','string'],
+            'yarn_h_count'  => ['nullable','string'],
+            'yarnWCount1'   => ['nullable','string'],
+        ]);
 
-    // เตรียม query หลัก
-    $query = AstPurchaseorder::query();
+        // === ทำความสะอาดอินพุต: ตัดช่องว่าง, NBSP, zero-width characters ===
+        $raw = $request->only([
+            'importId','customerName','imDate',
+            'yarnHType1','yarnWType1','yarn_h_count','yarnWCount1',
+        ]);
 
-    // 1) importId -> ค้นใน importStatus (partial match)
-    $query->when($request->filled('importId'), function ($q) use ($request) {
-        $q->where('importStatus', 'LIKE', '%' . $request->importId . '%');
-    });
+        $clean = collect($raw)->map(function ($v) {
+            if ($v === null) return null;
+            // แทน NBSP (0xC2A0) ด้วย space ปกติ
+            $v = str_replace("\xC2\xA0", ' ', $v);
+            // ตัด zero-width chars (200B–200D, FEFF)
+            $v = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $v);
+            $v = trim($v);
+            return $v === '' ? null : $v;
+        })->all();
 
-    // 2) customerName (partial match)
-    $query->when($request->filled('customerName'), function ($q) use ($request) {
-        $q->where('customerName', 'LIKE', '%' . $request->customerName . '%');
-    });
-
-    // 3) imDate (รับรูปแบบ d/m/Y → เทียบกับคอลัมน์วันที่)
-    $query->when($request->filled('imDate'), function ($q) use ($request) {
-        try {
-            $date = Carbon::createFromFormat('d/m/Y', $request->imDate)->format('Y-m-d');
-            // ถ้า createDate เป็น DATE/DATETIME ใช้ whereDate จะชัวร์กว่า LIKE
-            $q->whereDate('createDate', $date);
-        } catch (\Exception $e) {
-            // ถ้าพาร์สไม่ได้ ข้ามไป (หรือจะโยน validation error ก็ได้)
+        // เก็บค่าที่ผู้ใช้กรอกไว้คืน view (ตามพฤติกรรมเดิม)
+        // หมายเหตุ: เดิมโค้ดมีการตั้ง $select_search/$searchInput ตามเคส if-elseif
+        // ที่นี่เราจะเก็บ "คีย์แรกที่ไม่ว่าง" ไว้เป็นตัวชี้ เช่น importId/customerName/imDate
+        foreach (['importId','customerName','imDate','yarnHType1','yarnWType1','yarn_h_count','yarnWCount1'] as $k) {
+            if (!empty($clean[$k])) {
+                $select_search = $k;
+                $searchInput   = $clean[$k];
+                break;
+            }
         }
-    });
 
-    /**
-     * 4) กลุ่มเงื่อนไขที่อยู่ใน fabricStructure
-     * จากโค้ดเดิมมี pattern เช่น:
-     *  - yarnHType1   => '%{yarnHType1} * %'
-     *  - yarnWType1   => '% * {yarnWType1} / %'
-     *  - yarn_h_count => '% / {yarn_h_count} * %'   (จากโค้ดเดิมบรรทัดหนึ่งเป็น '% / ' + yarn_h_count + ' * %')
-     *  - yarnWCount1  => '% * {yarnWCount1}%'
-     *
-     * เราจะ AND เงื่อนไขเหล่านี้เข้าด้วยกันถ้ามีมากกว่า 1 ตัว เพื่อให้การค้นหาเป็นไปตามทุกตัวแปรที่ผู้ใช้กรอก
-     */
-    $hasFabricFilters = $request->filled('yarnHType1') ||
-                        $request->filled('yarnWType1') ||
-                        $request->filled('yarn_h_count') ||
-                        $request->filled('yarnWCount1');
+        // === สร้างคิวรีแบบ Dynamic ที่ AND เงื่อนไขทั้งหมดเข้าด้วยกัน ===
+        $query = AstPurchaseorder::query();
 
-    if ($hasFabricFilters) {
-        $query->where(function ($qq) use ($request) {
-            if ($request->filled('yarnHType1')) {
-                $qq->where('fabricStructure', 'LIKE', '%' . $request->yarnHType1 . ' * %');
+        // 1) importId: ค้นที่ importId เป็นหลัก + เผื่อ importStatus (ตามโค้ดเดิมของคุณที่เคยใช้ importStatus)
+        if ($clean['importId']) {
+            $v = $clean['importId'];
+            $query->where(function ($qq) use ($v) {
+                $qq->where('importId', 'LIKE', "%{$v}%")
+                   ->orWhere('importStatus', 'LIKE', "%{$v}%");
+            });
+        }
+
+        // 2) customerName
+        if ($clean['customerName']) {
+            $query->where('customerName', 'LIKE', "%{$clean['customerName']}%");
+        }
+
+        // 3) imDate: แปลงจาก d/m/Y เป็น Y-m-d แล้วใช้ whereDate ให้ตรงวัน
+        if ($clean['imDate']) {
+            try {
+                $date = \Carbon\Carbon::createFromFormat('d/m/Y', $clean['imDate'])->format('Y-m-d');
+                $query->whereDate('createDate', $date); // แก้จาก LIKE เป็น whereDate ตาม best practice
+            } catch (\Throwable $e) {
+                // พาร์สไม่ได้: ไม่ใส่เงื่อนไขวันที่
             }
-            if ($request->filled('yarnWType1')) {
-                $qq->where('fabricStructure', 'LIKE', '% * ' . $request->yarnWType1 . ' / %');
-            }
-            if ($request->filled('yarn_h_count')) {
-                // ตามโค้ดเดิม: '% / ' . yarn_h_count . ' * %'
-                $qq->where('fabricStructure', 'LIKE', '% / ' . $request->yarn_h_count . ' * %');
-            }
-            if ($request->filled('yarnWCount1')) {
-                $qq->where('fabricStructure', 'LIKE', '% * ' . $request->yarnWCount1 . '%');
+        }
+
+        // 4) กลุ่ม fabricStructure: ทำให้ยืดหยุ่นขึ้น (match token ตรง ๆ ด้วย %คำ%)
+        //    หากต้องการ strict pattern แบบเดิม ค่อยปรับเงื่อนไขแต่ละบรรทัดกลับเป็นรูปแบบ '%A * %' เป็นต้น
+        $query->where(function ($qq) use ($clean) {
+            $added = false;
+            if ($clean['yarnHType1'])   { $qq->where('fabricStructure', 'LIKE', "%{$clean['yarnHType1']}%"); $added = true; }
+            if ($clean['yarnWType1'])   { $qq->where('fabricStructure', 'LIKE', "%{$clean['yarnWType1']}%"); $added = true; }
+            if ($clean['yarn_h_count']) { $qq->where('fabricStructure', 'LIKE', "%{$clean['yarn_h_count']}%"); $added = true; }
+            if ($clean['yarnWCount1'])  { $qq->where('fabricStructure', 'LIKE', "%{$clean['yarnWCount1']}%"); $added = true; }
+
+            // ถ้าไม่มีเงื่อนไขใด ๆ ในกลุ่มนี้ ก็ไม่กระทบคิวรีรวม (no-op)
+            if (!$added) {
+                $qq->whereRaw('1=1');
             }
         });
+
+        // === เรียงล่าสุดก่อน + ใช้ paginate() เหมือนเดิม ===
+        $importorder = $query->orderByDesc('createDate')->paginate(20); // คุณใช้ paginate อยู่แล้วในไฟล์เดิม 
+
+        // === รายการทั้งหมดไว้ใช้งานในหน้า (คงพฤติกรรมเดิม) ===
+        $orderlist = AstPurchaseorder::orderByDesc('createDate')->paginate(20);
+
+        // === ข้อมูลประกอบสำหรับฟอร์ม/ตัวเลือก (คงพฤติกรรมเดิม) ===
+        $customers = customer::all('id', 'name');
+        $yarnType  = Material::orderBy('yarnType')->get()->groupBy(function ($data) {
+            return $data->yarnType;
+        });
+
+        // === ส่งค่ากลับไปยัง view เหมือนเดิม ===
+        return view('orders.index', compact(
+            'importorder',
+            'select_search',
+            'searchInput',
+            'orderlist',
+            'customers',
+            'yarnType',
+            'select_searchfill',
+            'Oldsearch'
+        ));
     }
-
-    // เรียงใหม่สุดก่อน และใช้ paginate จะดีกว่า get() (เผื่อข้อมูลเยอะ)
-    $importorder = $query->orderByDesc('createDate')->paginate(20);
-
-    // รายการทั้งหมดไว้โชว์สรุป/ด้านข้าง (ถ้ายังต้องใช้)
-    $orderlist = AstPurchaseorder::orderByDesc('createDate')->paginate(20);
-
-    // ข้อมูลประกอบหน้าค้นหา
-    $customers = Customer::all('id', 'name');
-    $yarnType  = Material::orderBy('yarnType')->get()->groupBy(fn ($m) => $m->yarnType);
-
-    // ส่งค่าที่ผู้ใช้กรอกกลับไป view ด้วย (เพื่อคงค่าในฟอร์ม)
-    $select_search   = null;   // ไม่จำเป็นต้องใช้แล้ว แต่คงตัวแปรไว้เผื่อ view ใช้
-    $searchInput     = null;
-    $select_searchfill = null;
-    $Oldsearch       = null;
-
-    return view('orders.index', compact(
-        'importorder',
-        'select_search',
-        'searchInput',
-        'orderlist',
-        'customers',
-        'yarnType',
-        'select_searchfill',
-        'Oldsearch'
-    ));
-}
 
         //     if ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
         //         //print('1 2 3 4');
