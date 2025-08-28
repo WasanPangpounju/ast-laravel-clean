@@ -339,12 +339,14 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                                             type="number"
                                             id="vatNo1"
                                             name="vatNo"
-                                            class="form-control pb-2"
+                                            class="form-control"
                                             style="max-width:100px"
                                             value="{{ $realVatNo }}"
                                             min="0" step="1"
                                             >
-                                    <label for="createDate">วันที่</label>
+                                    <label 
+                                    class="mt-2"
+                                     for="createDate">วันที่</label>
 
                                     <input class="date form-control" type="text" name="dt" autocomplete="off">
 
