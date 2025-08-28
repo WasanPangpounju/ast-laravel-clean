@@ -197,7 +197,7 @@
                                 <p>จำนวนรวม : <strong id="fabriccount"></strong> พับ <strong id="sum"></strong> หลา
                                 </p>
                                 <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
-                                <input type="hidden" id="vatNo1" name="vatNo1" value="">
+                                <!-- <input type="hidden" id="vatNo1" name="vatNo1" value=""> -->
 
                                 <?php
                                 
@@ -334,7 +334,7 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
 
                                 <input type="hidden" name="orderId" class="form-control" value="<?php print $order_id; ?>">
                                 <div class="form-group">
-                                      <label for="vatNo1" class="d-block mt-2">เลขที่บิลxxx</label>
+                                      <label for="vatNo1" class="d-block mt-2">เลขที่บิล</label>
                                             <input
                                             type="text"
                                             id="vatNo1"
@@ -1113,5 +1113,66 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
             });
         });
     </script>
+
+<script>
+(function(){
+  const input = document.getElementById('vatNo1');   // ช่องกรอกเลขบิล (id เดียวกับของคุณ)
+  const label = document.getElementById('vatno');    // ป้ายใน <h2>
+  const sel   = document.getElementById('vatType');  // select A/B/C
+  const hid   = document.getElementById('vatType1'); // hidden vatType (ยังมีอยู่)
+
+  const digits = s => String(s ?? '').replace(/\D/g, '');
+  const getType = () => (sel?.value) || (hid?.value) || 'A';
+
+  // เมื่อผู้ใช้พิมพ์ -> อัปเดตป้าย h2
+  function syncHeadingFromInput(){
+    if (!input || !label) return;
+    input.value = digits(input.value);
+    label.textContent = getType() + '-' + (input.value || '');
+  }
+
+  // เมื่อเลือก A/B/C -> ใส่เลขรันเดิมตามประเภท + อัปเดตป้าย
+  function syncInputFromType(){
+    if (!input || !label) return;
+    // เลขรันจาก server (ตัวแปรมีอยู่แล้ว)
+    const vatA = <?php echo (int)($vatA ?? 0); ?>;
+    const vatB = <?php echo (int)($vatB ?? 0); ?>;
+    const vatC = <?php echo (int)($vatC ?? 0); ?>;
+
+    let n = '';
+    const t = getType();
+    if (t === 'A') n = vatA;
+    if (t === 'B') n = vatB;
+    if (t === 'C') n = vatC;
+
+    input.value = digits(n);
+    label.textContent = t + '-' + input.value;
+  }
+
+  // ผูกเหตุการณ์
+  ['input','change','blur'].forEach(ev => input?.addEventListener(ev, syncHeadingFromInput));
+  sel?.addEventListener('change', syncInputFromType);
+
+  // radio deposit/receiver ของคุณมีตั้งค่า select อยู่แล้ว
+  // แค่ซิงก์ input/label หลัง select เปลี่ยน
+  document.getElementById('receiveType1')?.addEventListener('click', () => setTimeout(syncInputFromType, 0));
+  document.getElementById('receiveType2')?.addEventListener('click', () => setTimeout(syncInputFromType, 0));
+
+  // ครั้งแรก: ให้ช่องกรอกและ h2 สอดคล้องกับค่าที่ set เริ่มต้นไว้
+  // ถ้าใน <h2> มีค่าแล้ว ใช้ค่านั้นเติมลงช่องกรอก
+  (function initFromHeading(){
+    if (!input || !label) return;
+    const m = (label.textContent || '').match(/^[A-Z]\s*-\s*(\d+)/i);
+    if (m) {
+      input.value = digits(m[1]);
+    } else {
+      // ถ้า h2 ยังว่าง ให้ sync จากประเภทแทน
+      syncInputFromType();
+    }
+    // อัปเดต h2 อีกทีให้รูปแบบเท่ากัน
+    label.textContent = getType() + '-' + (input.value || '');
+  })();
+})();
+</script>
 
 @endsection
