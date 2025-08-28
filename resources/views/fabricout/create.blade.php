@@ -339,8 +339,8 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                                             type="number"
                                             id="vatNo1"
                                             name="vatNo"
-                                            class="form-control"
-                                            style="max-width:200px"
+                                            class="form-control pb-2"
+                                            style="max-width:100px"
                                             value="{{ $realVatNo }}"
                                             min="0" step="1"
                                             >
