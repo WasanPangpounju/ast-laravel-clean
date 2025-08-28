@@ -183,120 +183,95 @@ class OrderController extends Controller
     {
         //searchImport
         if ($request->filled('submit') && $request->submit == 'searchImport') {
-            $select_search = '';
-            $searchInput = '';
-            $select_searchfill = '';
-            $Oldsearch = '';
-        // === คงตัวแปรที่ view ใช้อยู่เดิม ===
-        $select_search     = '';
-        $searchInput       = '';
-        $select_searchfill = '';
-        $Oldsearch         = '';
+            // $select_search = '';
+            // $searchInput = '';
+            // $select_searchfill = '';
+            // $Oldsearch = '';
+            if ($request->filled('submit') && $request->submit == 'searchImport') {
+    $select_search     = '';
+    $searchInput       = '';
+    $select_searchfill = '';
+    $Oldsearch         = '';
 
-        // === Validation เบื้องต้นกันอินพุตเพี้ยน โดยเฉพาะวันที่ ===
-        $request->validate([
-            'importId'      => ['nullable','string'],
-            'customerName'  => ['nullable','string'],
-            'imDate'        => ['nullable','date_format:d/m/Y'],
-            'yarnHType1'    => ['nullable','string'],
-            'yarnWType1'    => ['nullable','string'],
-            'yarn_h_count'  => ['nullable','string'],
-            'yarnWCount1'   => ['nullable','string'],
-        ]);
+    $request->validate([
+        'importId'      => ['nullable','string'],
+        'customerName'  => ['nullable','string'],
+        'imDate'        => ['nullable','date_format:d/m/Y'],
+        'yarnHType1'    => ['nullable','string'],
+        'yarnWType1'    => ['nullable','string'],
+        'yarn_h_count'  => ['nullable','string'],
+        'yarnWCount1'   => ['nullable','string'],
+    ]);
 
-        // === ทำความสะอาดอินพุต: ตัดช่องว่าง, NBSP, zero-width characters ===
-        $raw = $request->only([
-            'importId','customerName','imDate',
-            'yarnHType1','yarnWType1','yarn_h_count','yarnWCount1',
-        ]);
+    $raw = $request->only([
+        'importId','customerName','imDate',
+        'yarnHType1','yarnWType1','yarn_h_count','yarnWCount1',
+    ]);
 
-        $clean = collect($raw)->map(function ($v) {
-            if ($v === null) return null;
-            // แทน NBSP (0xC2A0) ด้วย space ปกติ
-            $v = str_replace("\xC2\xA0", ' ', $v);
-            // ตัด zero-width chars (200B–200D, FEFF)
-            $v = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $v);
-            $v = trim($v);
-            return $v === '' ? null : $v;
-        })->all();
+    $clean = collect($raw)->map(function ($v) {
+        if ($v === null) return null;
+        $v = str_replace("\xC2\xA0", ' ', $v);
+        $v = preg_replace('/[\x{200B}-\x{200D}\x{FEFF}]/u', '', $v);
+        $v = trim($v);
+        return $v === '' ? null : $v;
+    })->all();
 
-        // เก็บค่าที่ผู้ใช้กรอกไว้คืน view (ตามพฤติกรรมเดิม)
-        // หมายเหตุ: เดิมโค้ดมีการตั้ง $select_search/$searchInput ตามเคส if-elseif
-        // ที่นี่เราจะเก็บ "คีย์แรกที่ไม่ว่าง" ไว้เป็นตัวชี้ เช่น importId/customerName/imDate
-        foreach (['importId','customerName','imDate','yarnHType1','yarnWType1','yarn_h_count','yarnWCount1'] as $k) {
-            if (!empty($clean[$k])) {
-                $select_search = $k;
-                $searchInput   = $clean[$k];
-                break;
-            }
+    $get  = fn(string $k) => $clean[$k] ?? null;
+
+    foreach (['importId','customerName','imDate','yarnHType1','yarnWType1','yarn_h_count','yarnWCount1'] as $k) {
+        $val = $get($k);
+        if (!is_null($val) && $val !== '') {
+            $select_search = $k;
+            $searchInput   = $val;
+            break;
         }
-
-        // === สร้างคิวรีแบบ Dynamic ที่ AND เงื่อนไขทั้งหมดเข้าด้วยกัน ===
-        $query = AstPurchaseorder::query();
-
-        // 1) importId: ค้นที่ importId เป็นหลัก + เผื่อ importStatus (ตามโค้ดเดิมของคุณที่เคยใช้ importStatus)
-        if ($clean['importId']) {
-            $v = $clean['importId'];
-            $query->where(function ($qq) use ($v) {
-                $qq->where('importId', 'LIKE', "%{$v}%")
-                   ->orWhere('importStatus', 'LIKE', "%{$v}%");
-            });
-        }
-
-        // 2) customerName
-        if ($clean['customerName']) {
-            $query->where('customerName', 'LIKE', "%{$clean['customerName']}%");
-        }
-
-        // 3) imDate: แปลงจาก d/m/Y เป็น Y-m-d แล้วใช้ whereDate ให้ตรงวัน
-        if ($clean['imDate']) {
-            try {
-                $date = \Carbon\Carbon::createFromFormat('d/m/Y', $clean['imDate'])->format('Y-m-d');
-                $query->whereDate('createDate', $date); // แก้จาก LIKE เป็น whereDate ตาม best practice
-            } catch (\Throwable $e) {
-                // พาร์สไม่ได้: ไม่ใส่เงื่อนไขวันที่
-            }
-        }
-
-        // 4) กลุ่ม fabricStructure: ทำให้ยืดหยุ่นขึ้น (match token ตรง ๆ ด้วย %คำ%)
-        //    หากต้องการ strict pattern แบบเดิม ค่อยปรับเงื่อนไขแต่ละบรรทัดกลับเป็นรูปแบบ '%A * %' เป็นต้น
-        $query->where(function ($qq) use ($clean) {
-            $added = false;
-            if ($clean['yarnHType1'])   { $qq->where('fabricStructure', 'LIKE', "%{$clean['yarnHType1']}%"); $added = true; }
-            if ($clean['yarnWType1'])   { $qq->where('fabricStructure', 'LIKE', "%{$clean['yarnWType1']}%"); $added = true; }
-            if ($clean['yarn_h_count']) { $qq->where('fabricStructure', 'LIKE', "%{$clean['yarn_h_count']}%"); $added = true; }
-            if ($clean['yarnWCount1'])  { $qq->where('fabricStructure', 'LIKE', "%{$clean['yarnWCount1']}%"); $added = true; }
-
-            // ถ้าไม่มีเงื่อนไขใด ๆ ในกลุ่มนี้ ก็ไม่กระทบคิวรีรวม (no-op)
-            if (!$added) {
-                $qq->whereRaw('1=1');
-            }
-        });
-
-        // === เรียงล่าสุดก่อน + ใช้ paginate() เหมือนเดิม ===
-        $importorder = $query->orderByDesc('createDate')->paginate(20); // คุณใช้ paginate อยู่แล้วในไฟล์เดิม 
-
-        // === รายการทั้งหมดไว้ใช้งานในหน้า (คงพฤติกรรมเดิม) ===
-        $orderlist = AstPurchaseorder::orderByDesc('createDate')->paginate(20);
-
-        // === ข้อมูลประกอบสำหรับฟอร์ม/ตัวเลือก (คงพฤติกรรมเดิม) ===
-        $customers = customer::all('id', 'name');
-        $yarnType  = Material::orderBy('yarnType')->get()->groupBy(function ($data) {
-            return $data->yarnType;
-        });
-
-        // === ส่งค่ากลับไปยัง view เหมือนเดิม ===
-        return view('orders.index', compact(
-            'importorder',
-            'select_search',
-            'searchInput',
-            'orderlist',
-            'customers',
-            'yarnType',
-            'select_searchfill',
-            'Oldsearch'
-        ));
     }
+
+    $query = AstPurchaseorder::query();
+
+    // ✅ importId -> ค้นหาใน importStatus
+    if ($get('importId')) {
+        $query->where('importStatus', 'LIKE', "%{$get('importId')}%");
+    }
+
+    if ($get('customerName')) {
+        $query->where('customerName', 'LIKE', "%{$get('customerName')}%");
+    }
+
+    if ($get('imDate')) {
+        try {
+            $date = \Carbon\Carbon::createFromFormat('d/m/Y', $get('imDate'))->format('Y-m-d');
+            $query->whereDate('createDate', $date);
+        } catch (\Throwable $e) {}
+    }
+
+    $query->where(function ($qq) use ($get) {
+        $added = false;
+        if ($get('yarnHType1'))   { $qq->where('fabricStructure', 'LIKE', "%{$get('yarnHType1')}%");   $added = true; }
+        if ($get('yarnWType1'))   { $qq->where('fabricStructure', 'LIKE', "%{$get('yarnWType1')}%");   $added = true; }
+        if ($get('yarn_h_count')) { $qq->where('fabricStructure', 'LIKE', "%{$get('yarn_h_count')}%"); $added = true; }
+        if ($get('yarnWCount1'))  { $qq->where('fabricStructure', 'LIKE', "%{$get('yarnWCount1')}%");  $added = true; }
+        if (!$added) { $qq->whereRaw('1=1'); }
+    });
+
+    $importorder = $query->orderByDesc('createDate')->paginate(20);
+    $orderlist   = AstPurchaseorder::orderByDesc('createDate')->paginate(20);
+
+    $customers = customer::all('id', 'name');
+    $yarnType  = Material::orderBy('yarnType')->get()->groupBy(fn($d) => $d->yarnType);
+
+    return view('orders.index', compact(
+        'importorder',
+        'select_search',
+        'searchInput',
+        'orderlist',
+        'customers',
+        'yarnType',
+        'select_searchfill',
+        'Oldsearch'
+    ));
+}
+
 
         //     if ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
         //         //print('1 2 3 4');
