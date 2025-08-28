@@ -345,7 +345,7 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                                             min="0" step="1"
                                             >
                                     <label 
-                                    class="mt-3"
+                                    class="mt-4"
                                      for="createDate">วันที่</label>
 
                                     <input class="date form-control" type="text" name="dt" autocomplete="off">
