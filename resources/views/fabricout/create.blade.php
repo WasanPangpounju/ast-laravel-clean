@@ -76,7 +76,7 @@
         $realVatType = empty($vatType) ? ($vatNoxParts[0] ?? '') : $vatType;
     @endphp
 
-    <label for="vatNo1" class="d-block mt-2">เลขที่บิล</label>
+    <label for="vatNo1" class="d-block mt-2">test</label>
 <input
   type="number"
   id="vatNo1"
