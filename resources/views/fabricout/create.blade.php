@@ -76,16 +76,7 @@
         $realVatType = empty($vatType) ? ($vatNoxParts[0] ?? '') : $vatType;
     @endphp
 
-    <label for="vatNo1" class="d-block mt-2">test</label>
-<input
-  type="number"
-  id="vatNo1"
-  name="vatNo"
-  class="form-control"
-  style="max-width:200px"
-  value="{{ $realVatNo }}"
-  min="0" step="1"
->
+  
 
     <!-- <input type="hidden" id="vatNo1" name="vatNo" value="{{ $realVatNo }}"> -->
     <input type="hidden" id="vatType1" name="vatType" value="{{ $realVatType }}">
@@ -343,6 +334,16 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
 
                                 <input type="hidden" name="orderId" class="form-control" value="<?php print $order_id; ?>">
                                 <div class="form-group">
+                                      <label for="vatNo1" class="d-block mt-2">เลขที่บิล</label>
+                                            <input
+                                            type="number"
+                                            id="vatNo1"
+                                            name="vatNo"
+                                            class="form-control"
+                                            style="max-width:200px"
+                                            value="{{ $realVatNo }}"
+                                            min="0" step="1"
+                                            >
                                     <label for="createDate">วันที่</label>
 
                                     <input class="date form-control" type="text" name="dt" autocomplete="off">
