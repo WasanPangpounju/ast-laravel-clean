@@ -336,7 +336,7 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                                 <div class="form-group">
                                       <label for="vatNo1" class="d-block mt-2">เลขที่บิล</label>
                                             <input
-                                            type="number"
+                                            type="text"
                                             id="vatNo1"
                                             name="vatNo"
                                             class="form-control"
