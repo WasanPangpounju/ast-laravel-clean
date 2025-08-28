@@ -188,116 +188,205 @@ class OrderController extends Controller
             $select_searchfill = '';
             $Oldsearch = '';
 
-            if ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
-                //print('1 2 3 4');
-            } elseif ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType')) {
-                //print('1 2 3');
-            } elseif ($request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
-                //print('2 3 4');
-            } elseif ($request->filled('importId') && $request->filled('customerName')) {
-                //print('1 2');
-            } elseif ($request->filled('yarnType') && $request->filled('imDate')) {
-                //print('3 4');
-            } elseif ($request->filled('customerName') && $request->filled('yarnType')) {
-                //print('2 3');
-            } elseif ($request->filled('importId') && $request->filled('imDate')) {
-                //print('1 4');
-            } elseif ($request->filled('importId') && $request->filled('yarnType')) {
-                //print('1 3');
-            } elseif ($request->filled('customerName') && $request->filled('imDate')) {
-                //print('2 4');
-            } elseif ($request->filled('importId')) {
-                $importorder = AstPurchaseorder::where('importStatus', 'LIKE', '%' . $request->importId . '%')->get();
-                //var_dump($importorder );
-                $select_search = 'importId';
-                $searchInput = $request->importId;
-            } elseif ($request->filled('customerName')) {
-                $importorder = AstPurchaseorder::where('customerName', 'LIKE', '%' . $request->customerName . '%')->get();
-                $select_search = 'customerName';
-                $searchInput = $request->customerName;
-            } elseif ($request->filled('yarnHType1')) {
-                $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '%' . $request->yarnHType1 . ' * %')->get();
-                $select_search = 'yarnHType1';
-                $searchInput = $request->yarnHType1;
-            } elseif ($request->filled('yarnWType1')) {
-                $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '% * ' . $request->yarnWType1 . ' / %')->get();
-                $select_search = 'yarnWType1';
-                $searchInput = $request->yarnWType1;
-            } elseif ($request->filled('yarn_h_count')) {
-                $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '% / ' . $request->yarn_h_count . ' * %')->get();
-                $select_search = 'yarn_h_count';
-                $searchInput = $request->yarn_h_count;
-            } elseif ($request->filled('yarnWCount1')) {
-                $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '% * ' . $request->yarnWCount1 . '%')->get();
-                $select_search = 'yarnWCount1';
-                $searchInput = $request->yarnWCount1;
-            } elseif ($request->filled('imDate')) {
+                if (! $request->filled('submit') || $request->submit !== 'searchImport') {
+        abort(400, 'Invalid submit');
+    }
 
-                // Create a DateTime object from the original date format
-                $dateObj = date_create_from_format('d/m/Y', $request->imDate);
+    // เตรียม query หลัก
+    $query = AstPurchaseorder::query();
 
-                // Convert the DateTime object to the desired format
-                $fixedValue = date_format($dateObj, 'Y-m-d');
-                $importorder = AstPurchaseorder::where('createDate', 'LIKE', '%' . $fixedValue . '%')->get();
-                $select_search = 'imDate';
-                $searchInput = $request->imDate;
-            } elseif (isset($request->select_search)) {
-                if ($request->select_search == 'importId') {
-                    $select_searchfill = 'importStatus';
-                    $Oldsearch = $request->Oldsearch;
-                    $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '%' . $Oldsearch . '%')->get();
-                } elseif ($request->select_search == 'customerName') {
-                    $select_searchfill = 'customerName';
-                    $Oldsearch = $request->Oldsearch;
-                    $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '%' . $Oldsearch . '%')->get();
-                } elseif ($request->select_search == 'yarnHType1') {
-                    $select_searchfill = 'fabricStructure';
-                    $Oldsearch = $request->Oldsearch;
-                    $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '%' . $Oldsearch . ' * %')->get();
-                } elseif ($request->select_search == 'yarnWType1') {
-                    $select_searchfill = 'fabricStructure';
-                    $Oldsearch = $request->Oldsearch;
-                    $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '% * ' . $Oldsearch . ' / %')->get();
-                } elseif ($request->select_search == 'yarn_h_count') {
-                    $select_searchfill = 'fabricStructure';
-                    $Oldsearch = $request->Oldsearch;
-                    $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '% ' . $Oldsearch . ' * %')->get();
-                } elseif ($request->select_search == 'yarnWCount1') {
-                    $select_searchfill = 'fabricStructure';
-                    $Oldsearch = $request->Oldsearch;
-                    $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '% * ' . $Oldsearch . '%')->get();
-                } elseif ($request->select_search == 'imDate') {
-                    $select_searchfill = 'createDate';
-                    $Oldsearch = $request->Oldsearch;
-                    $dateObj = date_create_from_format('d/m/Y', $Oldsearch);
-                    // Convert the DateTime object to the desired format
-                    $fixedValue = date_format($dateObj, 'Y-m-d');
-                    $Oldsearch = $fixedValue;
-                    $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '%' . $Oldsearch . '%')->get();
-                }
-                // $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '% * ' . $Oldsearch . '%')->get();
-            }
+    // 1) importId -> ค้นใน importStatus (partial match)
+    $query->when($request->filled('importId'), function ($q) use ($request) {
+        $q->where('importStatus', 'LIKE', '%' . $request->importId . '%');
+    });
 
-            $orderlist = AstPurchaseorder::orderByDesc('createDate')->get();
+    // 2) customerName (partial match)
+    $query->when($request->filled('customerName'), function ($q) use ($request) {
+        $q->where('customerName', 'LIKE', '%' . $request->customerName . '%');
+    });
 
-            // $fabricStructureEdit = FabricAststructure::where('purchaseOrder', $orderEdit->id)->get();
-            // for ($i = 0; $i < count($orderlist); $i++) {
-            //     $st = $this->getStatus($orderlist[$i]->id);
-            //     if ($st == 'no data') {
-            //         $orderlist[$i]->status = 'สร้างใบสั่งซื้อ';
-            //     } else {
-            //         $orderlist[$i]->status = $st;
-            //     }
-            // }
-
-            //guide data display for search 
-            $customers = customer::all('id', 'name');
-            //Get all material import group by yarnType
-            $yarnType = Material::orderBy('yarnType')->get()->groupBy(function ($data) {
-                return $data->yarnType;
-            });
-            return view('orders.index', compact('importorder', 'select_search', 'searchInput', 'orderlist', 'customers', 'yarnType', 'select_searchfill', 'Oldsearch'));
+    // 3) imDate (รับรูปแบบ d/m/Y → เทียบกับคอลัมน์วันที่)
+    $query->when($request->filled('imDate'), function ($q) use ($request) {
+        try {
+            $date = Carbon::createFromFormat('d/m/Y', $request->imDate)->format('Y-m-d');
+            // ถ้า createDate เป็น DATE/DATETIME ใช้ whereDate จะชัวร์กว่า LIKE
+            $q->whereDate('createDate', $date);
+        } catch (\Exception $e) {
+            // ถ้าพาร์สไม่ได้ ข้ามไป (หรือจะโยน validation error ก็ได้)
         }
+    });
+
+    /**
+     * 4) กลุ่มเงื่อนไขที่อยู่ใน fabricStructure
+     * จากโค้ดเดิมมี pattern เช่น:
+     *  - yarnHType1   => '%{yarnHType1} * %'
+     *  - yarnWType1   => '% * {yarnWType1} / %'
+     *  - yarn_h_count => '% / {yarn_h_count} * %'   (จากโค้ดเดิมบรรทัดหนึ่งเป็น '% / ' + yarn_h_count + ' * %')
+     *  - yarnWCount1  => '% * {yarnWCount1}%'
+     *
+     * เราจะ AND เงื่อนไขเหล่านี้เข้าด้วยกันถ้ามีมากกว่า 1 ตัว เพื่อให้การค้นหาเป็นไปตามทุกตัวแปรที่ผู้ใช้กรอก
+     */
+    $hasFabricFilters = $request->filled('yarnHType1') ||
+                        $request->filled('yarnWType1') ||
+                        $request->filled('yarn_h_count') ||
+                        $request->filled('yarnWCount1');
+
+    if ($hasFabricFilters) {
+        $query->where(function ($qq) use ($request) {
+            if ($request->filled('yarnHType1')) {
+                $qq->where('fabricStructure', 'LIKE', '%' . $request->yarnHType1 . ' * %');
+            }
+            if ($request->filled('yarnWType1')) {
+                $qq->where('fabricStructure', 'LIKE', '% * ' . $request->yarnWType1 . ' / %');
+            }
+            if ($request->filled('yarn_h_count')) {
+                // ตามโค้ดเดิม: '% / ' . yarn_h_count . ' * %'
+                $qq->where('fabricStructure', 'LIKE', '% / ' . $request->yarn_h_count . ' * %');
+            }
+            if ($request->filled('yarnWCount1')) {
+                $qq->where('fabricStructure', 'LIKE', '% * ' . $request->yarnWCount1 . '%');
+            }
+        });
+    }
+
+    // เรียงใหม่สุดก่อน และใช้ paginate จะดีกว่า get() (เผื่อข้อมูลเยอะ)
+    $importorder = $query->orderByDesc('createDate')->paginate(20);
+
+    // รายการทั้งหมดไว้โชว์สรุป/ด้านข้าง (ถ้ายังต้องใช้)
+    $orderlist = AstPurchaseorder::orderByDesc('createDate')->paginate(20);
+
+    // ข้อมูลประกอบหน้าค้นหา
+    $customers = Customer::all('id', 'name');
+    $yarnType  = Material::orderBy('yarnType')->get()->groupBy(fn ($m) => $m->yarnType);
+
+    // ส่งค่าที่ผู้ใช้กรอกกลับไป view ด้วย (เพื่อคงค่าในฟอร์ม)
+    $select_search   = null;   // ไม่จำเป็นต้องใช้แล้ว แต่คงตัวแปรไว้เผื่อ view ใช้
+    $searchInput     = null;
+    $select_searchfill = null;
+    $Oldsearch       = null;
+
+    return view('orders.index', compact(
+        'importorder',
+        'select_search',
+        'searchInput',
+        'orderlist',
+        'customers',
+        'yarnType',
+        'select_searchfill',
+        'Oldsearch'
+    ));
+}
+
+        //     if ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
+        //         //print('1 2 3 4');
+        //     } elseif ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType')) {
+        //         //print('1 2 3');
+        //     } elseif ($request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
+        //         //print('2 3 4');
+        //     } elseif ($request->filled('importId') && $request->filled('customerName')) {
+        //         //print('1 2');
+        //     } elseif ($request->filled('yarnType') && $request->filled('imDate')) {
+        //         //print('3 4');
+        //     } elseif ($request->filled('customerName') && $request->filled('yarnType')) {
+        //         //print('2 3');
+        //     } elseif ($request->filled('importId') && $request->filled('imDate')) {
+        //         //print('1 4');
+        //     } elseif ($request->filled('importId') && $request->filled('yarnType')) {
+        //         //print('1 3');
+        //     } elseif ($request->filled('customerName') && $request->filled('imDate')) {
+        //         //print('2 4');
+        //     } elseif ($request->filled('importId')) {
+        //         $importorder = AstPurchaseorder::where('importStatus', 'LIKE', '%' . $request->importId . '%')->get();
+        //         //var_dump($importorder );
+        //         $select_search = 'importId';
+        //         $searchInput = $request->importId;
+        //     } elseif ($request->filled('customerName')) {
+        //         $importorder = AstPurchaseorder::where('customerName', 'LIKE', '%' . $request->customerName . '%')->get();
+        //         $select_search = 'customerName';
+        //         $searchInput = $request->customerName;
+        //     } elseif ($request->filled('yarnHType1')) {
+        //         $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '%' . $request->yarnHType1 . ' * %')->get();
+        //         $select_search = 'yarnHType1';
+        //         $searchInput = $request->yarnHType1;
+        //     } elseif ($request->filled('yarnWType1')) {
+        //         $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '% * ' . $request->yarnWType1 . ' / %')->get();
+        //         $select_search = 'yarnWType1';
+        //         $searchInput = $request->yarnWType1;
+        //     } elseif ($request->filled('yarn_h_count')) {
+        //         $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '% / ' . $request->yarn_h_count . ' * %')->get();
+        //         $select_search = 'yarn_h_count';
+        //         $searchInput = $request->yarn_h_count;
+        //     } elseif ($request->filled('yarnWCount1')) {
+        //         $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '% * ' . $request->yarnWCount1 . '%')->get();
+        //         $select_search = 'yarnWCount1';
+        //         $searchInput = $request->yarnWCount1;
+        //     } elseif ($request->filled('imDate')) {
+
+        //         // Create a DateTime object from the original date format
+        //         $dateObj = date_create_from_format('d/m/Y', $request->imDate);
+
+        //         // Convert the DateTime object to the desired format
+        //         $fixedValue = date_format($dateObj, 'Y-m-d');
+        //         $importorder = AstPurchaseorder::where('createDate', 'LIKE', '%' . $fixedValue . '%')->get();
+        //         $select_search = 'imDate';
+        //         $searchInput = $request->imDate;
+        //     } elseif (isset($request->select_search)) {
+        //         if ($request->select_search == 'importId') {
+        //             $select_searchfill = 'importStatus';
+        //             $Oldsearch = $request->Oldsearch;
+        //             $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '%' . $Oldsearch . '%')->get();
+        //         } elseif ($request->select_search == 'customerName') {
+        //             $select_searchfill = 'customerName';
+        //             $Oldsearch = $request->Oldsearch;
+        //             $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '%' . $Oldsearch . '%')->get();
+        //         } elseif ($request->select_search == 'yarnHType1') {
+        //             $select_searchfill = 'fabricStructure';
+        //             $Oldsearch = $request->Oldsearch;
+        //             $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '%' . $Oldsearch . ' * %')->get();
+        //         } elseif ($request->select_search == 'yarnWType1') {
+        //             $select_searchfill = 'fabricStructure';
+        //             $Oldsearch = $request->Oldsearch;
+        //             $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '% * ' . $Oldsearch . ' / %')->get();
+        //         } elseif ($request->select_search == 'yarn_h_count') {
+        //             $select_searchfill = 'fabricStructure';
+        //             $Oldsearch = $request->Oldsearch;
+        //             $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '% ' . $Oldsearch . ' * %')->get();
+        //         } elseif ($request->select_search == 'yarnWCount1') {
+        //             $select_searchfill = 'fabricStructure';
+        //             $Oldsearch = $request->Oldsearch;
+        //             $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '% * ' . $Oldsearch . '%')->get();
+        //         } elseif ($request->select_search == 'imDate') {
+        //             $select_searchfill = 'createDate';
+        //             $Oldsearch = $request->Oldsearch;
+        //             $dateObj = date_create_from_format('d/m/Y', $Oldsearch);
+        //             // Convert the DateTime object to the desired format
+        //             $fixedValue = date_format($dateObj, 'Y-m-d');
+        //             $Oldsearch = $fixedValue;
+        //             $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '%' . $Oldsearch . '%')->get();
+        //         }
+        //         // $importorder = AstPurchaseorder::where($select_searchfill, 'LIKE', '% * ' . $Oldsearch . '%')->get();
+        //     }
+
+        //     $orderlist = AstPurchaseorder::orderByDesc('createDate')->get();
+
+        //     // $fabricStructureEdit = FabricAststructure::where('purchaseOrder', $orderEdit->id)->get();
+        //     // for ($i = 0; $i < count($orderlist); $i++) {
+        //     //     $st = $this->getStatus($orderlist[$i]->id);
+        //     //     if ($st == 'no data') {
+        //     //         $orderlist[$i]->status = 'สร้างใบสั่งซื้อ';
+        //     //     } else {
+        //     //         $orderlist[$i]->status = $st;
+        //     //     }
+        //     // }
+
+        //     //guide data display for search 
+        //     $customers = customer::all('id', 'name');
+        //     //Get all material import group by yarnType
+        //     $yarnType = Material::orderBy('yarnType')->get()->groupBy(function ($data) {
+        //         return $data->yarnType;
+        //     });
+        //     return view('orders.index', compact('importorder', 'select_search', 'searchInput', 'orderlist', 'customers', 'yarnType', 'select_searchfill', 'Oldsearch'));
+        // }
 
         //edit production
         if ($request->filled('submit') && $request->submit == 'editproduction') {
