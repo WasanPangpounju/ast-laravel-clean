@@ -270,7 +270,6 @@ class OrderController extends Controller
         'select_searchfill',
         'Oldsearch'
     ));
-}
 
 
         //     if ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
