@@ -798,7 +798,7 @@ class FabricoutController extends Controller
                 if (isset($records[0]->fabricStructReplace)) {
                     $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStructReplace . ' '), 0, 0);
                 } else {
-                    $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStruct . ' ' . ' #' . $records[0]->fabricW . ' \' ' . $records[0]->fabricPattern ), 0, 0);
+                    $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStruct . ' ' . ' #' . $records[0]->fabricW . ' \'\' ' . $records[0]->fabricPattern ), 0, 0);
                     // $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า : ' . $records[0]->fabricStructReplace . ' '), 0, 0);
                 }
                 $this->fpdf->Cell(60, 10, '', 0, 0);
