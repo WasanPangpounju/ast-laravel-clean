@@ -711,8 +711,8 @@ class FabricoutController extends Controller
         }
         if ($request->filled('submit') && $request->submit == 'submitfabricout') {
             $fabricout_no = $request->fabricout_no;
-            $records = fabricout::groupBy(['vatType', 'vatNo', 'comment', 'fabricStruct', 'no', 'refId', 'customerName', 'receiveName', 'customerReplace', 'fabricStructReplace'])
-                ->selectRaw('vatType,vatNo,comment,customerReplace,fabricStructReplace,fabricStruct,receiveName,no, customerName, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
+            $records = fabricout::groupBy(['vatType', 'vatNo', 'comment', 'fabricStruct', 'fabricPattern', 'fabricW', 'no', 'refId', 'customerName', 'receiveName', 'customerReplace', 'fabricStructReplace'])
+                ->selectRaw('vatType,vatNo,comment,customerReplace,fabricStructReplace,fabricStruct, fabricPattern , fabricW , receiveName,no, customerName, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
                 ->where('no', $fabricout_no)
                 ->get();
 
@@ -798,7 +798,7 @@ class FabricoutController extends Controller
                 if (isset($records[0]->fabricStructReplace)) {
                     $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStructReplace . ' '), 0, 0);
                 } else {
-                    $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStruct  ), 0, 0);
+                    $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStruct . ' ' . $records[0]->fabricPattern . ' #' . $records[0]->fabricW ), 0, 0);
                     // $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า : ' . $records[0]->fabricStructReplace . ' '), 0, 0);
                 }
                 $this->fpdf->Cell(60, 10, '', 0, 0);
