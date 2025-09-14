@@ -51,7 +51,8 @@ public function index()
             fabricPattern,
             fabricW,
             COUNT(fold)  AS foldCount,
-            SUM(sumYard) AS sumYardSum
+            SUM(sumYard) AS sumYardSum,
+            MAX(createDate) AS lastDate        -- ✅ เอาวันล่าสุดมาเป็น aggregate
         ")
         ->groupBy(
             'fabricStruct',
@@ -60,7 +61,7 @@ public function index()
             \DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"),
             'fabricId'
         )
-        ->orderBy('createDate', 'desc')
+        ->orderByDesc('lastDate')              -- ✅ สั่งเรียงด้วย alias ที่ aggregate แล้ว
         ->get();
     $sumStockfabric = $records;
 
