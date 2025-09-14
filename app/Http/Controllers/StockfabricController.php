@@ -57,7 +57,7 @@ public function index()
             'fabricStruct',
             'fabricPattern',
             'fabricW',
-            \DB::raw(\"COALESCE(NULLIF(TRIM(customer), ''), 'AST')\"),
+            \DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"),
             'fabricId'
         )
         ->orderBy('createDate', 'desc')
@@ -73,10 +73,10 @@ public function index()
             SUM(sumYard) AS sumYardSum
         ")
         ->groupBy(
+            \DB::raw("COALESCE(NULLIF(TRIM(customerName), ''), 'AST')"),
             'fabricStruct',
             'fabricPattern',
-            'fabricW',
-            \DB::raw(\"COALESCE(NULLIF(TRIM(customerName), ''), 'AST')\")
+            'fabricW'
         )
         ->get();
     $sumFabricout = $record2;
