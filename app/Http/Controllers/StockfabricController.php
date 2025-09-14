@@ -20,26 +20,69 @@ class StockfabricController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
-    {
-        //
-        $records = StockFabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW', 'customer','fabricId'])
-            ->selectRaw('fabricId,customer,fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
-            ->orderBy('createDate', 'desc')
-            ->get();
-        // ->count();
-        // var_dump($records );
-        $sumStockfabric = $records;
-        $record2 = fabricout::groupBy(['fabricStruct', 'fabricPattern', 'fabricW'])
-            ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
-            ->get();
-        // ->count();
-        // var_dump($records );
-        $sumFabricout = $record2;
-        // print_r($sumStockfabric);
-        // print_r($sumFabricout);
-        return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
-    }
+    // public function index()
+    // {
+    //     //
+    //     $records = StockFabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW', 'customer','fabricId'])
+    //         ->selectRaw('fabricId,customer,fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
+    //         ->orderBy('createDate', 'desc')
+    //         ->get();
+    //     // ->count();
+    //     // var_dump($records );
+    //     $sumStockfabric = $records;
+    //     $record2 = fabricout::groupBy(['fabricStruct', 'fabricPattern', 'fabricW'])
+    //         ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
+    //         ->get();
+    //     // ->count();
+    //     // var_dump($records );
+    //     $sumFabricout = $record2;
+    //     // print_r($sumStockfabric);
+    //     // print_r($sumFabricout);
+    //     return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
+    // }
+//โค้ดใหม่
+public function index()
+{
+    //
+    $records = StockFabric::selectRaw("
+            fabricId,
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+            fabricStruct,
+            fabricPattern,
+            fabricW,
+            COUNT(fold)  AS foldCount,
+            SUM(sumYard) AS sumYardSum
+        ")
+        ->groupBy(
+            'fabricStruct',
+            'fabricPattern',
+            'fabricW',
+            \DB::raw(\"COALESCE(NULLIF(TRIM(customer), ''), 'AST')\"),
+            'fabricId'
+        )
+        ->orderBy('createDate', 'desc')
+        ->get();
+    $sumStockfabric = $records;
+
+    $record2 = fabricout::selectRaw("
+            COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer,
+            fabricStruct,
+            fabricPattern,
+            fabricW,
+            COUNT(fold)  AS foldCount,
+            SUM(sumYard) AS sumYardSum
+        ")
+        ->groupBy(
+            'fabricStruct',
+            'fabricPattern',
+            'fabricW',
+            \DB::raw(\"COALESCE(NULLIF(TRIM(customerName), ''), 'AST')\")
+        )
+        ->get();
+    $sumFabricout = $record2;
+
+    return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
+}
 
     /**
      * Show the form for creating a new resource.
