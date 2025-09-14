@@ -43,10 +43,24 @@ class StockfabricController extends Controller
 //โค้ดใหม่
 public function index()
 {
-    // IN: StockFabric (ลูกค้าว่าง = 'AST')
-    $records = StockFabric::selectRaw("
+    // ---------- IN: stockfabrics (normalize customer -> customer_norm) ----------
+    $sfSub = \DB::table('stockfabrics')
+        ->selectRaw("
             fabricId,
-            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+            fabricStruct,
+            fabricPattern,
+            fabricW,
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer_norm,
+            fold,
+            sumYard,
+            createDate
+        ");
+
+    $records = \DB::query()
+        ->fromSub($sfSub, 's')
+        ->selectRaw("
+            fabricId,
+            customer_norm AS customer,
             fabricStruct,
             fabricPattern,
             fabricW,
@@ -54,33 +68,36 @@ public function index()
             SUM(sumYard) AS sumYardSum,
             MAX(createDate) AS lastDate
         ")
-        ->groupBy(
-            'fabricStruct',
-            'fabricPattern',
-            'fabricW',
-            \DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"),
-            'fabricId'
-        )
+        ->groupBy('fabricStruct', 'fabricPattern', 'fabricW', 'customer', 'fabricId')
         ->orderByDesc('lastDate')
         ->get();
+
     $sumStockfabric = $records;
 
-    // OUT: fabricout (ลูกค้ารับว่าง = 'AST')
-    $record2 = fabricout::selectRaw("
-            COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer,
+    // ---------- OUT: fabricouts (normalize customerName -> customer_norm) ----------
+    $foSub = \DB::table('fabricouts')
+        ->selectRaw("
+            fabricStruct,
+            fabricPattern,
+            fabricW,
+            COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer_norm,
+            fold,
+            sumYard
+        ");
+
+    $record2 = \DB::query()
+        ->fromSub($foSub, 'o')
+        ->selectRaw("
+            customer_norm AS customer,
             fabricStruct,
             fabricPattern,
             fabricW,
             COUNT(fold)  AS foldCount,
             SUM(sumYard) AS sumYardSum
         ")
-        ->groupBy(
-            \DB::raw("COALESCE(NULLIF(TRIM(customerName), ''), 'AST')"),
-            'fabricStruct',
-            'fabricPattern',
-            'fabricW'
-        )
+        ->groupBy('customer', 'fabricStruct', 'fabricPattern', 'fabricW')
         ->get();
+
     $sumFabricout = $record2;
 
     return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
