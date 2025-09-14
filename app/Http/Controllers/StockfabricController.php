@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;     // ✅ ย้ายมาไว้ตรงนี้ (บนหัวไฟล์เท่านั้น)
 use App\Models\stockfabric;
 use App\Models\fabricout;
 
