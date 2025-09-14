@@ -20,26 +20,137 @@ class StockfabricController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
-    {
-        //
-        $records = StockFabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW', 'customer','fabricId'])
-            ->selectRaw('fabricId,customer,fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
-            ->orderBy('createDate', 'desc')
-            ->get();
-        // ->count();
-        // var_dump($records );
-        $sumStockfabric = $records;
-        $record2 = fabricout::groupBy(['fabricStruct', 'fabricPattern', 'fabricW'])
-            ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
-            ->get();
-        // ->count();
-        // var_dump($records );
-        $sumFabricout = $record2;
-        // print_r($sumStockfabric);
-        // print_r($sumFabricout);
-        return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
-    }
+    // public function index()
+    // {
+    //     //
+    //     $records = StockFabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW', 'customer','fabricId'])
+    //         ->selectRaw('fabricId,customer,fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
+    //         ->orderBy('createDate', 'desc')
+    //         ->get();
+    //     // ->count();
+    //     // var_dump($records );
+    //     $sumStockfabric = $records;
+    //     $record2 = fabricout::groupBy(['fabricStruct', 'fabricPattern', 'fabricW'])
+    //         ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
+    //         ->get();
+    //     // ->count();
+    //     // var_dump($records );
+    //     $sumFabricout = $record2;
+    //     // print_r($sumStockfabric);
+    //     // print_r($sumFabricout);
+    //     return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
+    // }
+// โค้ดใหม่ ใช้ ast เป็นค่า defause ของ ลูกค้าหากไม่มีชื่อลูกค้าตัด stock
+use Illuminate\Support\Facades\DB;
+
+public function index()
+{
+    // ========= 1) IN: stockfabrics =========
+    // NOTE: ปรับชื่อ table ให้ตรงกับจริง ถ้าใช้ conventions มักจะเป็น "stock_fabrics"
+    $sumStockfabric = DB::table('stockfabrics')
+        ->selectRaw("
+            fabricId,
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST')          AS customer,   -- ถ้าว่าง ให้เป็น 'AST'
+            fabricStruct,
+            fabricPattern,
+            fabricW,
+            COUNT(fold)                                          AS foldCount,
+            SUM(sumYard)                                         AS sumYardSum,
+            MAX(createDate)                                      AS lastDateIn
+        ")
+        ->groupBy(
+            'fabricId',
+            DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"),
+            'fabricStruct',
+            'fabricPattern',
+            'fabricW'
+        )
+        ->orderByDesc('lastDateIn')
+        ->get();
+
+    // ========= 2) OUT: fabricouts =========
+    // จับคู่คีย์ให้เหมือนฝั่ง IN และ default customerName ว่าง -> 'AST'
+    $sumFabricout = DB::table('fabricouts')
+        ->selectRaw("
+            COALESCE(NULLIF(TRIM(customerName), ''), 'AST')       AS customer,
+            fabricStruct,
+            fabricPattern,
+            fabricW,
+            COUNT(fold)                                           AS foldCount,
+            SUM(sumYard)                                          AS sumYardSum,
+            MAX(createDate)                                       AS lastDateOut
+        ")
+        ->groupBy(
+            DB::raw("COALESCE(NULLIF(TRIM(customerName), ''), 'AST')"),
+            'fabricStruct',
+            'fabricPattern',
+            'fabricW'
+        )
+        ->get();
+
+    // ========= 3) (ออปชัน) รวมเป็น “คงเหลือ” ไว้ใช้ในตารางหลัก =========
+    // ถ้ายังไม่ต้องแสดงคงเหลือ สามารถคอมเมนต์บล็อกนี้ทิ้งได้
+    $in  = DB::table('stockfabrics')
+        ->selectRaw("
+            fabricId,
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+            fabricStruct, fabricPattern, fabricW,
+            COUNT(fold)  AS in_foldCount,
+            SUM(sumYard) AS in_sumYard,
+            MAX(createDate) AS in_lastDate
+        ")
+        ->groupBy(
+            'fabricId',
+            DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"),
+            'fabricStruct','fabricPattern','fabricW'
+        );
+
+    $out = DB::table('fabricouts')
+        ->selectRaw("
+            COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer,
+            fabricStruct, fabricPattern, fabricW,
+            COUNT(fold)  AS out_foldCount,
+            SUM(sumYard) AS out_sumYard,
+            MAX(createDate) AS out_lastDate
+        ")
+        ->groupBy(
+            DB::raw("COALESCE(NULLIF(TRIM(customerName), ''), 'AST')"),
+            'fabricStruct','fabricPattern','fabricW'
+        );
+
+    $inSql  = $in->toSql();
+    $outSql = $out->toSql();
+
+    $sumStock = DB::table(DB::raw("($inSql) AS i"))
+        ->mergeBindings($in)
+        ->leftJoin(DB::raw("($outSql) AS o"), function($j){
+            $j->on('i.customer','=','o.customer')
+              ->on('i.fabricStruct','=','o.fabricStruct')
+              ->on('i.fabricPattern','=','o.fabricPattern')
+              ->on('i.fabricW','=','o.fabricW');
+        })
+        ->mergeBindings($out)
+        ->selectRaw("
+            i.fabricId,
+            i.customer,
+            i.fabricStruct, i.fabricPattern, i.fabricW,
+            COALESCE(i.in_foldCount,0)  AS in_foldCount,
+            COALESCE(i.in_sumYard,0)    AS in_sumYard,
+            COALESCE(o.out_foldCount,0) AS out_foldCount,
+            COALESCE(o.out_sumYard,0)   AS out_sumYard,
+            COALESCE(i.in_foldCount,0)  - COALESCE(o.out_foldCount,0) AS bal_fold,
+            COALESCE(i.in_sumYard,0)    - COALESCE(o.out_sumYard,0)   AS bal_sumYard,
+            GREATEST(
+                COALESCE(i.in_lastDate,  '0000-00-00'),
+                COALESCE(o.out_lastDate, '0000-00-00')
+            ) AS last_movement
+        ")
+        ->orderByDesc('last_movement')
+        ->paginate(20); // ถ้าอยากใช้ในหน้าแสดงรวม
+
+    // ส่งค่ากลับ view
+    return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout', 'sumStock'));
+}
 
     /**
      * Show the form for creating a new resource.
