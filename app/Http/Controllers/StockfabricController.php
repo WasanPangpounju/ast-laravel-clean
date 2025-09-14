@@ -43,7 +43,7 @@ class StockfabricController extends Controller
 //โค้ดใหม่
 public function index()
 {
-    //
+    // IN: StockFabric (ลูกค้าว่าง = 'AST')
     $records = StockFabric::selectRaw("
             fabricId,
             COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
@@ -52,7 +52,7 @@ public function index()
             fabricW,
             COUNT(fold)  AS foldCount,
             SUM(sumYard) AS sumYardSum,
-            MAX(createDate) AS lastDate        -- ✅ เอาวันล่าสุดมาเป็น aggregate
+            MAX(createDate) AS lastDate
         ")
         ->groupBy(
             'fabricStruct',
@@ -61,10 +61,11 @@ public function index()
             \DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"),
             'fabricId'
         )
-        ->orderByDesc('lastDate')              -- ✅ สั่งเรียงด้วย alias ที่ aggregate แล้ว
+        ->orderByDesc('lastDate')
         ->get();
     $sumStockfabric = $records;
 
+    // OUT: fabricout (ลูกค้ารับว่าง = 'AST')
     $record2 = fabricout::selectRaw("
             COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer,
             fabricStruct,
