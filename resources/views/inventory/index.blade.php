@@ -155,19 +155,7 @@
                         </div>
                     </div>
                     <!--row-->
-                    <div class="col-md-3 d-flex align-items-end gap-2">
-  <button name="submit" value="searchImport" class="btn btn-primary w-100">
-    <img src="{{ asset('assets/images/circle-check-solid.png') }}" width="17" alt="">
-    ค้นหา
-  </button>
-
-  {{-- แบบรีเซ็ตฟอร์มในหน้า ไม่ยิง request --}}
-  <button type="reset" class="btn btn-outline-secondary">เคลียร์</button>
-
-  {{-- หรือแบบ reload หน้า index (ล้าง old input + โหลดรายการทั้งหมด) --}}
-  {{-- <a href="{{ route('inventory.index') }}" class="btn btn-outline-secondary">เคลียร์</a> --}}
-</div>
-
+                    
                     <div class="line_btn">
                         <button  name="submit" value="cleanForm" class="btn b_order clean"><img
                                 src="<?php echo asset('assets/images/xmark-solid.png'); ?>" width="15"> เคลียร์ข้อมูล</button>
