@@ -94,7 +94,6 @@
                                     </button>
                                 </div>
                             </div>
-                            <!--row-->
                         </div>
                     </div>
                 </form>
@@ -162,7 +161,7 @@
                                                             @csrf
                                                             <input type="hidden" id="refId" name="refId" value="">
                                                             <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
-                                                            <input type="hidden" name="fabricStruct" value="{{ $importorder[$i]->fabricStruct }}" id="fabricStruct">
+                                                            <input type="hidden" name="fabricStruct" value="{{ $fs_norm($importorder[$i]->fabricStruct) }}" id="fabricStruct">
                                                             <input type="hidden" name="fabricPattern" value="{{ $importorder[$i]->fabricPattern }}" id="fabricPattern">
                                                             <input type="hidden" name="fabricW" value="{{ $importorder[$i]->fabricW }}" id="fabricW">
                                                             <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
@@ -190,7 +189,7 @@
                                                         @csrf
                                                         <input type="hidden" id="refId" name="refId" value="">
                                                         <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
-                                                        <input type="hidden" name="fabricStruct" value="{{ $importorder[$i]->fabricStruct }}" id="fabricStruct">
+                                                        <input type="hidden" name="fabricStruct" value="{{ $fs_norm($importorder[$i]->fabricStruct) }}" id="fabricStruct">
                                                         <input type="hidden" name="fabricPattern" value="{{ $importorder[$i]->fabricPattern }}" id="fabricPattern">
                                                         <input type="hidden" name="fabricW" value="{{ $importorder[$i]->fabricW }}" id="fabricW">
                                                         <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
@@ -257,7 +256,7 @@
                                                             @csrf
                                                             <input type="hidden" id="refId" name="refId" value="">
                                                             <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
-                                                            <input type="hidden" name="fabricStruct" value="{{ $sumStockfabric[$i]->fabricStruct }}" id="fabricStruct">
+                                                            <input type="hidden" name="fabricStruct" value="{{ $fs_norm($sumStockfabric[$i]->fabricStruct) }}" id="fabricStruct">
                                                             <input type="hidden" name="fabricPattern" value="{{ $sumStockfabric[$i]->fabricPattern }}" id="fabricPattern">
                                                             <input type="hidden" name="fabricW" value="{{ $sumStockfabric[$i]->fabricW }}" id="fabricW">
                                                             <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
@@ -285,7 +284,7 @@
                                                         @csrf
                                                         <input type="hidden" id="refId" name="refId" value="">
                                                         <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
-                                                        <input type="hidden" name="fabricStruct" value="{{ $sumStockfabric[$i]->fabricStruct }}" id="fabricStruct">
+                                                        <input type="hidden" name="fabricStruct" value="{{ $fs_norm($sumStockfabric[$i]->fabricStruct) }}" id="fabricStruct">
                                                         <input type="hidden" name="fabricPattern" value="{{ $sumStockfabric[$i]->fabricPattern }}" id="fabricPattern">
                                                         <input type="hidden" name="fabricW" value="{{ $sumStockfabric[$i]->fabricW }}" id="fabricW">
                                                         <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
