@@ -156,7 +156,7 @@
                     </div>
                     <!--row-->
                     <div class="line_btn">
-                        <button name="submit" value="cleanForm" class="btn b_order clean"><img
+                        <button type="reset" name="submit" value="cleanForm" class="btn b_order clean"><img
                                 src="<?php echo asset('assets/images/xmark-solid.png'); ?>" width="15"> เคลียร์ข้อมูล</button>
                         <button name="submit" value="searchImport" class="btn_search"><img src="<?php echo asset('assets/images/circle-check-solid.png'); ?>"
                                 width="17">
