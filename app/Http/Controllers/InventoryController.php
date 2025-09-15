@@ -157,268 +157,117 @@ class InventoryController extends Controller
         //
         //searchImport
         if ($request->filled('submit') && $request->submit == 'searchImport') {
-            $select_search = '';
-            $searchInput = '';
+    // ---- helper: normalize fabricStruct => ให้ * == x, ตัดช่องว่าง/undefined แล้ว lower ----
+    $normFs = function (?string $s) {
+        $s = (string) $s;
+        $s = str_replace('undefined', '', $s);
+        $s = preg_replace('/\s*([*x])\s*/i', 'x', $s); // ให้ตัวคั่นเป็น x ตัวเดียว
+        $s = preg_replace('/\s+/', '', $s);            // ลบช่องว่างทั้งหมด
+        return strtolower(trim($s));
+    };
+    // ฝั่งคอลัมน์ DB (fabricStructure) แปลงรูปแบบให้ตรงกับค่าที่ normalize
+    $fsExpr = "REPLACE(REPLACE(LOWER(fabricStructure),' ',''),'*','x')";
 
-            if ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
-                //print('1 2 3 4');
-            } elseif ($request->filled('importId') && $request->filled('customerName') && $request->filled('yarnType')) {
-                //print('1 2 3');
-            } elseif ($request->filled('customerName') && $request->filled('yarnType') && $request->filled('imDate')) {
-                //print('2 3 4');
-            } elseif ($request->filled('importId') && $request->filled('customerName')) {
-                //print('1 2');
-            } elseif ($request->filled('yarnType') && $request->filled('imDate')) {
-                //print('3 4');
-            } elseif ($request->filled('customerName') && $request->filled('yarnType')) {
-                //print('2 3');
-            } elseif ($request->filled('importId') && $request->filled('imDate')) {
-                //print('1 4');
-            } elseif ($request->filled('importId') && $request->filled('yarnType')) {
-                //print('1 3');
-            } elseif ($request->filled('customerName') && $request->filled('imDate')) {
-                //print('2 4');
-            } elseif ($request->filled('fabricStruct') && $request->filled('fabricPattern') && $request->filled('fabricW')) {
-                // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
-                $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
+    // เก็บค่าที่ผู้ใช้กรอก (จะ AND เงื่อนไขทั้งหมดที่มี)
+    $customerName  = $request->input('customerName');
+    $fabricStruct  = $request->input('fabricStruct');         // จะ normalize
+    $fabricPattern = $request->input('fabricPattern');
+    $fabricW       = $request->input('fabricW');
+    $fabricId      = $request->input('fabricId');
+    $orderId       = $request->input('orderId');
+    $imDate        = $request->input('imDate');               // d/m/Y
 
-                $importorder = AstPurchaseorder::where('fabricPattern', 'LIKE',  $request->fabricPattern)
-                    ->where('fabricStructure', 'LIKE',  $request->fabricStructure)
-                    ->select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
+    // ออร์เดอร์ที่ "อนุมัติให้ผลิต"
+    $ecp = AstPurchaseorder::where('status', 'อนุมัติให้ผลิต')->pluck('id');
 
-                $orders = AstPurchaseorder::select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
-                $inventorydata = Inventory::select('refId', Inventory::raw('SUM(fold) as foldSum'), Inventory::raw('SUM(sumYard) as sumYardSum'))
-                    ->groupBy('refId')
-                    ->get();
-                // print_r($inventorydata);
-                // $fabricoutdata = fabricout::select('orderId', fabricout::raw('SUM(fold) as foldSum'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                //     ->groupBy('orderId')
-                //     ->get();
-                // print_r($fabricoutdata);
-                $fabricoutdata = fabricout::select('orderId', fabricout::raw('COUNT(fold) as foldCount'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                    ->whereNotNull('orderId')
-                    ->groupBy('orderId')
-                    ->get();
-                $fabricoutdata2 = FabricAst::select('purchaseOrder', 'fabric_w')
-                    ->where('fabric_w', 'LIKE',  $request->fabricW)
-                    // ->whereIn('purchaseOrder', $ecp)
-                    // ->groupBy('purchaseOrder','fabric_w')
-                    ->get();
-                //var_dump($importorder );
-                //print($request->importId);
-                $select_search = 'importId';
-                $searchInput = $request->importId;
-            } elseif ($request->filled('customerName')) {
-                // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
-                $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
+    // สร้างคิวรีหลัก แล้วค่อย ๆ เติม where ตามฟิลด์ที่กรอกมา
+    $q = AstPurchaseorder::select(
+            'id','customerName','createDate','fabricId',
+            'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
+        )
+        ->whereIn('id', $ecp);
 
-                $importorder = AstPurchaseorder::where('customerName', 'LIKE', '%' . $request->customerName . '%')
-                    ->select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
+    if (filled($customerName)) {
+        $q->where('customerName', 'LIKE', '%'.$customerName.'%');
+    }
 
-                $orders = AstPurchaseorder::select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
-                $inventorydata = Inventory::select('refId', Inventory::raw('SUM(fold) as foldSum'), Inventory::raw('SUM(sumYard) as sumYardSum'))
-                    ->groupBy('refId')
-                    ->get();
-                // print_r($inventorydata);
-                // $fabricoutdata = fabricout::select('orderId', fabricout::raw('SUM(fold) as foldSum'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                //     ->groupBy('orderId')
-                //     ->get();
-                // print_r($fabricoutdata);
-                $fabricoutdata = fabricout::select('orderId', fabricout::raw('COUNT(fold) as foldCount'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                    ->whereNotNull('orderId')
-                    ->groupBy('orderId')
-                    ->get();
-                $fabricoutdata2 = FabricAst::select('purchaseOrder', 'fabric_w')
-                    // ->whereIn('purchaseOrder', $ecp)
-                    // ->groupBy('purchaseOrder','fabric_w')
-                    ->get();
-                //var_dump($importorder );
-                //print($request->importId);
-                $select_search = 'importId';
-                $searchInput = $request->importId;
-            } elseif ($request->filled('orderId')) {
-                // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
-                $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
+    if (filled($fabricStruct)) {
+        $needleFs = $normFs($fabricStruct);
+        $q->whereRaw("$fsExpr = ?", [$needleFs]);
+    }
 
-                $importorder = AstPurchaseorder::where('id', 'LIKE', '%' . $request->orderId . '%')
-                    ->select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
+    if (filled($fabricPattern)) {
+        // ถ้าต้องการเท่ากันเป๊ะ เปลี่ยน 'LIKE' เป็น '=' ได้
+        $q->where('fabricPattern', 'LIKE', $fabricPattern);
+    }
 
-                $orders = AstPurchaseorder::select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
-                $inventorydata = Inventory::select('refId', Inventory::raw('SUM(fold) as foldSum'), Inventory::raw('SUM(sumYard) as sumYardSum'))
-                    ->groupBy('refId')
-                    ->get();
-                // print_r($inventorydata);
-                // $fabricoutdata = fabricout::select('orderId', fabricout::raw('SUM(fold) as foldSum'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                //     ->groupBy('orderId')
-                //     ->get();
-                // print_r($fabricoutdata);
-                $fabricoutdata = fabricout::select('orderId', fabricout::raw('COUNT(fold) as foldCount'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                    ->whereNotNull('orderId')
-                    ->groupBy('orderId')
-                    ->get();
-                $fabricoutdata2 = FabricAst::select('purchaseOrder', 'fabric_w')
-                    // ->whereIn('purchaseOrder', $ecp)
-                    // ->groupBy('purchaseOrder','fabric_w')
-                    ->get();
-                //print($request->customerName);
-                $select_search = 'customerName';
-                $searchInput = $request->customerName;
-            } elseif ($request->filled('fabricId')) {
-                // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
-                $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
+    if (filled($fabricW)) {
+        // ถ้าต้องการเท่ากันเป๊ะ เปลี่ยน 'LIKE' เป็น '=' ได้
+        $q->where('fabric_w', 'LIKE', $fabricW);
+    }
 
-                $importorder = AstPurchaseorder::where('fabricId', 'LIKE', '%' . $request->fabricId . '%')
-                    ->select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    // ->orderBy('createDate', 'desc')
-                    ->get();
+    if (filled($fabricId)) {
+        $q->where('fabricId', 'LIKE', '%'.$fabricId.'%');
+    }
 
-                $orders = AstPurchaseorder::select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
-                $inventorydata = Inventory::select('refId', Inventory::raw('SUM(fold) as foldSum'), Inventory::raw('SUM(sumYard) as sumYardSum'))
-                    ->groupBy('refId')
-                    ->get();
-                // print_r($inventorydata);
-                // $fabricoutdata = fabricout::select('orderId', fabricout::raw('SUM(fold) as foldSum'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                //     ->groupBy('orderId')
-                //     ->get();
-                // print_r($fabricoutdata);
-                $fabricoutdata = fabricout::select('orderId', fabricout::raw('COUNT(fold) as foldCount'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                    ->whereNotNull('orderId')
-                    ->groupBy('orderId')
-                    ->get();
-                $fabricoutdata2 = FabricAst::select('purchaseOrder', 'fabric_w')
-                    // ->whereIn('purchaseOrder', $ecp)
-                    // ->groupBy('purchaseOrder','fabric_w')
-                    ->get();
-                //print($request->yarnType );
-                $select_search = 'yarnType';
-                $searchInput = $request->yarnType;
-            } elseif ($request->filled('fabricStruct')) {
-                // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->pluck('id')->toArray();
-                $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
-                $importorder = AstPurchaseorder::where('fabricStructure', 'LIKE', '%' . $request->fabricStruct . '%')
-                    ->select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
+    if (filled($orderId)) {
+        $q->where('id', 'LIKE', '%'.$orderId.'%');
+    }
 
-                $orders = AstPurchaseorder::select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
-                $inventorydata = Inventory::select('refId', Inventory::raw('SUM(fold) as foldSum'), Inventory::raw('SUM(sumYard) as sumYardSum'))
-                    ->groupBy('refId')
-                    ->get();
-                // print_r($inventorydata);
-                // $fabricoutdata = fabricout::select('orderId', fabricout::raw('SUM(fold) as foldSum'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                //     ->groupBy('orderId')
-                //     ->get();
-                // print_r($fabricoutdata);
-                $fabricoutdata = fabricout::select('orderId', fabricout::raw('COUNT(fold) as foldCount'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                    ->whereNotNull('orderId')
-                    ->groupBy('orderId')
-                    ->get();
-                $fabricoutdata2 = FabricAst::select('purchaseOrder', 'fabric_w')
-                    // ->whereIn('purchaseOrder', $ecp)
-                    // ->groupBy('purchaseOrder','fabric_w')
-                    ->get();
-
-                //print($request->yarnType );
-                $select_search = 'yarnType';
-                $searchInput = $request->yarnType;
-            } elseif ($request->filled('imDate')) {
-                // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
-                $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
-
-                // Create a DateTime object from the original date format
-                $dateObj = date_create_from_format('d/m/Y', $request->imDate);
-
-                // Convert the DateTime object to the desired format
-                $fixedValue = date_format($dateObj, 'Y-m-d');
-                $importorder = AstPurchaseorder::where('createDate', 'LIKE', '%' . $fixedValue . '%')
-                    ->select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
-
-                $orders = AstPurchaseorder::select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-                    ->whereIn('id', $ecp)
-                    // ->orderBy('created_at', 'desc')
-                    ->orderBy('createDate', 'desc')
-                    ->get();
-                $inventorydata = Inventory::select('refId', Inventory::raw('SUM(fold) as foldSum'), Inventory::raw('SUM(sumYard) as sumYardSum'))
-                    ->groupBy('refId')
-                    ->get();
-                // print_r($inventorydata);
-                // $fabricoutdata = fabricout::select('orderId', fabricout::raw('SUM(fold) as foldSum'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                //     ->groupBy('orderId')
-                //     ->get();
-                // print_r($fabricoutdata);
-                $fabricoutdata = fabricout::select('orderId', fabricout::raw('COUNT(fold) as foldCount'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-                    ->whereNotNull('orderId')
-                    ->groupBy('orderId')
-                    ->get();
-                $fabricoutdata2 = FabricAst::select('purchaseOrder', 'fabric_w')
-                    // ->whereIn('purchaseOrder', $ecp)
-                    // ->groupBy('purchaseOrder','fabric_w')
-                    ->get();
-                //print($request->imDate);
-                $select_search = 'imDate';
-                $searchInput = $request->imDate;
-            } else {
-                // $importorder = AstPurchaseorder::where('importStatus', 'LIKE', '%' . $request->importId . '%')->get();
-                // $select_search = 'non data';
-            }
-
-            // $orderlist = AstPurchaseorder::orderByDesc('createDate')->get();
-
-            // // $fabricStructureEdit = FabricAststructure::where('purchaseOrder', $orderEdit->id)->get();
-            // for ($i = 0; $i < count($orderlist); $i++) {
-            //     $st = $this->getStatus($orderlist[$i]->id);
-            //     if ($st == 'no data') {
-            //         $orderlist[$i]->status = 'สร้างใบสั่งซื้อ';
-            //     } else {
-            //         $orderlist[$i]->status = $st;
-            //     }
-            // }
-            // print_r($request->imDate);
-            // print_r($importorder);
-            return view('inventory.index', compact('importorder', 'select_search', 'inventorydata', 'fabricoutdata', 'fabricoutdata2', 'orders'));
+    if (filled($imDate)) {
+        // แปลง d/m/Y -> Y-m-d แล้ว whereDate ให้ตรงวัน
+        $dateObj = \DateTime::createFromFormat('d/m/Y', $imDate);
+        if ($dateObj) {
+            $q->whereDate('createDate', $dateObj->format('Y-m-d'));
         }
+    }
 
+    // ยิงคิวรี
+    $importorder = $q->orderBy('createDate','desc')->get();
 
+    // ของเดิมที่ view ใช้อยู่
+    $orders = AstPurchaseorder::select(
+            'id','customerName','createDate','fabricId',
+            'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
+        )
+        ->whereIn('id', $ecp)
+        ->orderBy('createDate','desc')
+        ->get();
+
+    $inventorydata = Inventory::select(
+            'refId',
+            Inventory::raw('SUM(fold) as foldSum'),
+            Inventory::raw('SUM(sumYard) as sumYardSum')
+        )
+        ->groupBy('refId')
+        ->get();
+
+    $fabricoutdata = fabricout::select(
+            'orderId',
+            fabricout::raw('COUNT(fold) as foldCount'),
+            fabricout::raw('SUM(sumYard) as sumYardSum')
+        )
+        ->whereNotNull('orderId')
+        ->groupBy('orderId')
+        ->get();
+
+    // ถ้าผู้ใช้กรอก fabricW ก็กรองให้สอดคล้อง, ไม่งั้นดึงทั้งหมดตามเดิม
+    $f2 = FabricAst::select('purchaseOrder','fabric_w');
+    if (filled($fabricW)) {
+        $f2->where('fabric_w', 'LIKE', $fabricW);
+    }
+    $fabricoutdata2 = $f2->get();
+
+    // คงตัวแปรสำหรับ view เดิม (ใช้หรือไม่ใช้ไม่เป็นไร แต่ไม่ทำให้พัง)
+    $select_search = '';
+    $searchInput   = '';
+
+    return view('inventory.index', compact(
+        'importorder','select_search','inventorydata','fabricoutdata','fabricoutdata2','orders'
+    ));
+}
+
+//สิ้นสุดการค้นหาข้อมูล inventory
         //check next data then save and set end count to session  and show create with end count
         if ($request->filled('submit') && $request->submit == 'nextData') {
             $oldEnd = session()->get('endCount');
