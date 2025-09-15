@@ -156,54 +156,60 @@ class InventoryController extends Controller
     {
         //
         //searchImport
-        if ($request->filled('submit') && $request->submit == 'searchImport') {
-    // ---- helper: normalize fabricStruct => ให้ * == x, ตัดช่องว่าง/undefined แล้ว lower ----
+        
+if ($request->filled('submit') && $request->submit == 'searchImport') {
+
+    // --- helper: normalize fabricStruct ให้ * == x, ตัดช่องว่าง/undefined, เป็น lower ---
     $normFs = function (?string $s) {
         $s = (string) $s;
         $s = str_replace('undefined', '', $s);
-        $s = preg_replace('/\s*([*x])\s*/i', 'x', $s); // ให้ตัวคั่นเป็น x ตัวเดียว
-        $s = preg_replace('/\s+/', '', $s);            // ลบช่องว่างทั้งหมด
+        // ให้ตัวคั่น * และ x กลายเป็น x ตัวเดียว และตัดช่องว่าง
+        $s = preg_replace('/\s*([*x])\s*/i', 'x', $s);
+        $s = preg_replace('/\s+/', '', $s);
         return strtolower(trim($s));
     };
-    // ฝั่งคอลัมน์ DB (fabricStructure) แปลงรูปแบบให้ตรงกับค่าที่ normalize
+    // ฝั่งคอลัมน์ใน DB ของ AstPurchaseorder
     $fsExpr = "REPLACE(REPLACE(LOWER(fabricStructure),' ',''),'*','x')";
 
-    // เก็บค่าที่ผู้ใช้กรอก (จะ AND เงื่อนไขทั้งหมดที่มี)
+    // รับค่าที่กรอกมา (จะ AND ทุกเงื่อนไขที่มี)
     $customerName  = $request->input('customerName');
-    $fabricStruct  = $request->input('fabricStruct');         // จะ normalize
+    $fabricStruct  = $request->input('fabricStruct');     // จะ normalize
     $fabricPattern = $request->input('fabricPattern');
-    $fabricW       = $request->input('fabricW');
+    $fabricW       = $request->input('fabricW');          // อยู่ในตาราง FabricAst (ไม่ใช่ ast_purchaseorders)
     $fabricId      = $request->input('fabricId');
     $orderId       = $request->input('orderId');
-    $imDate        = $request->input('imDate');               // d/m/Y
+    $imDate        = $request->input('imDate');           // d/m/Y
 
-    // ออร์เดอร์ที่ "อนุมัติให้ผลิต"
+    // ออเดอร์ที่อนุมัติให้ผลิต
     $ecp = AstPurchaseorder::where('status', 'อนุมัติให้ผลิต')->pluck('id');
 
-    // สร้างคิวรีหลัก แล้วค่อย ๆ เติม where ตามฟิลด์ที่กรอกมา
+    // คิวรีหลัก
     $q = AstPurchaseorder::select(
             'id','customerName','createDate','fabricId',
             'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
-        )
-        ->whereIn('id', $ecp);
+        )->whereIn('id', $ecp);
 
     if (filled($customerName)) {
         $q->where('customerName', 'LIKE', '%'.$customerName.'%');
     }
 
     if (filled($fabricStruct)) {
-        $needleFs = $normFs($fabricStruct);
-        $q->whereRaw("$fsExpr = ?", [$needleFs]);
+        $q->whereRaw("$fsExpr = ?", [$normFs($fabricStruct)]);
     }
 
     if (filled($fabricPattern)) {
-        // ถ้าต้องการเท่ากันเป๊ะ เปลี่ยน 'LIKE' เป็น '=' ได้
+        // ถ้าต้องเท่ากันเป๊ะ เปลี่ยนเป็น '=' ได้
         $q->where('fabricPattern', 'LIKE', $fabricPattern);
     }
 
+    // ✅ กรองตามหน้ากว้าง (fabric_w) ผ่านตาราง FabricAst เพราะคอลัมน์นี้ไม่ได้อยู่ใน ast_purchaseorders
     if (filled($fabricW)) {
-        // ถ้าต้องการเท่ากันเป๊ะ เปลี่ยน 'LIKE' เป็น '=' ได้
-        $q->where('fabric_w', 'LIKE', $fabricW);
+        $q->whereExists(function ($sub) use ($fabricW) {
+            $sub->select(DB::raw(1))
+                ->from('fabric_asts') // <-- ถ้าชื่อตารางของโมเดล FabricAst ไม่ใช่ชื่อนี้ ให้แก้ให้ตรง
+                ->whereColumn('fabric_asts.purchaseOrder', 'ast_purchaseorders.purchaseOrder')
+                ->where('fabric_asts.fabric_w', 'LIKE', $fabricW);
+        });
     }
 
     if (filled($fabricId)) {
@@ -215,17 +221,16 @@ class InventoryController extends Controller
     }
 
     if (filled($imDate)) {
-        // แปลง d/m/Y -> Y-m-d แล้ว whereDate ให้ตรงวัน
-        $dateObj = \DateTime::createFromFormat('d/m/Y', $imDate);
-        if ($dateObj) {
-            $q->whereDate('createDate', $dateObj->format('Y-m-d'));
+        $dt = \DateTime::createFromFormat('d/m/Y', $imDate);
+        if ($dt) {
+            $q->whereDate('createDate', $dt->format('Y-m-d'));
         }
     }
 
-    // ยิงคิวรี
+    // ยิงคิวรีผลลัพธ์ค้นหา
     $importorder = $q->orderBy('createDate','desc')->get();
 
-    // ของเดิมที่ view ใช้อยู่
+    // ข้อมูลประกอบเดิมที่ view ใช้อยู่
     $orders = AstPurchaseorder::select(
             'id','customerName','createDate','fabricId',
             'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
@@ -251,23 +256,22 @@ class InventoryController extends Controller
         ->groupBy('orderId')
         ->get();
 
-    // ถ้าผู้ใช้กรอก fabricW ก็กรองให้สอดคล้อง, ไม่งั้นดึงทั้งหมดตามเดิม
+    // ดึง fabric_w สำหรับประกอบฝั่ง view (คงพฤติกรรมเดิม)
     $f2 = FabricAst::select('purchaseOrder','fabric_w');
     if (filled($fabricW)) {
         $f2->where('fabric_w', 'LIKE', $fabricW);
     }
     $fabricoutdata2 = $f2->get();
 
-    // คงตัวแปรสำหรับ view เดิม (ใช้หรือไม่ใช้ไม่เป็นไร แต่ไม่ทำให้พัง)
+    // คงตัวแปรสำหรับ view ตามเดิม
     $select_search = '';
     $searchInput   = '';
 
     return view('inventory.index', compact(
-        'importorder','select_search','inventorydata','fabricoutdata','fabricoutdata2','orders'
+        'importorder', 'select_search', 'inventorydata', 'fabricoutdata', 'fabricoutdata2', 'orders'
     ));
 }
 
-//สิ้นสุดการค้นหาข้อมูล inventory
         //check next data then save and set end count to session  and show create with end count
         if ($request->filled('submit') && $request->submit == 'nextData') {
             $oldEnd = session()->get('endCount');
