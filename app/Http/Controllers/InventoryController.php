@@ -160,152 +160,132 @@ class InventoryController extends Controller
 
         if ($request->filled('submit') && $request->submit == 'searchImport') {
 
-    // --- helper: normalize fabricStruct ---
+    // --- normalize fabricStruct: * == x, ลบช่องว่าง, to lower ---
     $normFs = function (?string $s) {
         $s = (string) $s;
         $s = str_replace('undefined', '', $s);
-        // ให้ * และ x ใช้แทนกันได้ และตัดช่องว่างทั้งหมด
+        // ให้ * และ x เป็นตัวคั่นเดียวกัน และตัดช่องว่างรอบตัวคั่นออก
         $s = preg_replace('/\s*([*x])\s*/i', 'x', $s);
+        // ลบช่องว่างที่เหลือทั้งหมด
         $s = preg_replace('/\s+/', '', $s);
         return strtolower(trim($s));
     };
-    // ฝั่งคอลัมน์ใน DB
+    // ฝั่งคอลัมน์ใน DB (ast_purchaseorders)
     $fsExpr = "REPLACE(REPLACE(LOWER(fabricStructure),' ',''),'*','x')";
 
-    // รับค่าจากฟอร์ม
+    // --- รับ input ---
     $customerName  = $request->input('customerName');
     $fabricStruct  = $request->input('fabricStruct');
     $fabricPattern = $request->input('fabricPattern');
-    $fabricW       = $request->input('fabricW');
+    $fabricW       = $request->input('fabricW');   // ตาราง FabricAst
     $fabricId      = $request->input('fabricId');
     $orderId       = $request->input('orderId');
-    $imDate        = $request->input('imDate');
+    $imDate        = $request->input('imDate');    // d/m/Y
 
     // ออเดอร์ที่อนุมัติให้ผลิต
     $ecp = AstPurchaseorder::where('status', 'อนุมัติให้ผลิต')->pluck('id');
 
-    // ========== สเต็ปหลัก: ค้นหาแบบยืดหยุ่น ==========
+    // ====== สร้างคิวรีแบบ "แม่นก่อน" ======
     $q = AstPurchaseorder::select(
             'id','customerName','createDate','fabricId',
             'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
         )->whereIn('id', $ecp);
 
-    // customerName: LIKE + เสริม SOUNDEX ให้ช่วยกรณีพิมพ์เพี้ยน
+    // customerName: เริ่มจาก like prefix ให้แคบก่อน
     if (filled($customerName)) {
-        $q->where(function($w) use ($customerName) {
-            $w->where('customerName','LIKE','%'.$customerName.'%')
-              ->orWhereRaw('SOUNDEX(customerName) = SOUNDEX(?)', [$customerName]);
-        });
+        $q->where('customerName', 'LIKE', $customerName.'%');
     }
 
-    // fabricStruct: เปลี่ยนจาก = เป็น LIKE (ยืดหยุ่นขึ้น)
+    // fabricStruct: เริ่มจาก == หลัง normalize (แม่น)
     if (filled($fabricStruct)) {
-        $needleFs = $normFs($fabricStruct);
-        $q->whereRaw("$fsExpr LIKE ?", ['%'.$needleFs.'%']);
+        $q->whereRaw("$fsExpr = ?", [$normFs($fabricStruct)]);
     }
 
-    // fabricPattern
+    // fabricPattern: ถ้าต้องตรง ให้ใช้ '=' (ถ้าอยากยืดหยุ่นค่อย fallback)
     if (filled($fabricPattern)) {
-        // ถ้าต้องเป๊ะมากขึ้นให้เปลี่ยนเป็น '=' ได้
-        $q->where('fabricPattern','LIKE','%'.$fabricPattern.'%');
+        $q->where('fabricPattern', $fabricPattern);
     }
 
-    // fabricW: อยู่ใน FabricAst -> ใช้ whereExists + LIKE
+    // fabricW: อยู่ใน FabricAst — เริ่มจาก '=' ให้แม่นก่อน
     if (filled($fabricW)) {
         $q->whereExists(function ($sub) use ($fabricW) {
             $sub->select(DB::raw(1))
-                ->from('fabric_asts') // ปรับให้ตรงชื่อตารางจริงของ FabricAst
-                ->whereColumn('fabric_asts.purchaseOrder','ast_purchaseorders.purchaseOrder')
-                ->where('fabric_asts.fabric_w','LIKE','%'.$fabricW.'%');
+                ->from('fabric_asts') // แก้ให้ตรงชื่อตารางจริงของ FabricAst
+                ->whereColumn('fabric_asts.purchaseOrder', 'ast_purchaseorders.purchaseOrder')
+                ->where('fabric_asts.fabric_w', $fabricW);
         });
     }
 
     if (filled($fabricId)) {
-        $q->where('fabricId','LIKE','%'.$fabricId.'%');
+        $q->where('fabricId', $fabricId);
     }
 
     if (filled($orderId)) {
-        $q->where('id','LIKE','%'.$orderId.'%');
+        $q->where('id', $orderId);
     }
 
     if (filled($imDate)) {
         $dt = \DateTime::createFromFormat('d/m/Y', $imDate);
-        if ($dt) $q->whereDate('createDate', $dt->format('Y-m-d'));
+        if ($dt) {
+            $q->whereDate('createDate', $dt->format('Y-m-d'));
+        }
     }
 
-    // ยิงคิวรีรอบแรก
+    // ยิงรอบแรก (แม่น)
     $importorder = $q->orderBy('createDate','desc')->get();
 
-    // ========== Fallback: ถ้ารอบแรกไม่เจออะไร ให้คลายเงื่อนไข fabricStruct เพิ่ม ==========
-    if ($importorder->isEmpty() && filled($fabricStruct)) {
-        $needleFs = $normFs($fabricStruct);
-        // แตกเป็น token ด้วยตัวคั่น x และ /
-        $tokens = array_values(array_filter(preg_split('/[x\/]+/i', $needleFs)));
-
+    // ====== Fallback: ถ้าไม่เจอเลย ค่อย "ยืดหยุ่น" บางเงื่อนไข ======
+    if ($importorder->isEmpty()) {
         $q2 = AstPurchaseorder::select(
                 'id','customerName','createDate','fabricId',
                 'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
             )->whereIn('id', $ecp);
 
         if (filled($customerName)) {
-            $q2->where(function($w) use ($customerName) {
-                $w->where('customerName','LIKE','%'.$customerName.'%')
-                  ->orWhereRaw('SOUNDEX(customerName) = SOUNDEX(?)', [$customerName]);
-            });
+            // ขยายเป็น contains
+            $q2->where('customerName', 'LIKE', '%'.$customerName.'%');
         }
 
-        // ต้องมีทุก token ปรากฏใน fabricStructure (ไม่สนลำดับ)
-        foreach ($tokens as $t) {
-            $q2->whereRaw("$fsExpr LIKE ?", ['%'.$t.'%']);
+        if (filled($fabricStruct)) {
+            // ขยายจาก == เป็น LIKE ใกล้เคียง (normalized ทั้งสองฝั่ง)
+            $needle = $normFs($fabricStruct);
+            $q2->whereRaw("$fsExpr LIKE ?", ['%'.$needle.'%']);
         }
 
         if (filled($fabricPattern)) {
-            $q2->where('fabricPattern','LIKE','%'.$fabricPattern.'%');
+            // ขยายเป็น LIKE แทน =
+            $q2->where('fabricPattern', 'LIKE', '%'.$fabricPattern.'%');
         }
 
         if (filled($fabricW)) {
+            // ขยายเป็น LIKE แทน =
             $q2->whereExists(function ($sub) use ($fabricW) {
                 $sub->select(DB::raw(1))
                     ->from('fabric_asts')
-                    ->whereColumn('fabric_asts.purchaseOrder','ast_purchaseorders.purchaseOrder')
-                    ->where('fabric_asts.fabric_w','LIKE','%'.$fabricW.'%');
+                    ->whereColumn('fabric_asts.purchaseOrder', 'ast_purchaseorders.purchaseOrder')
+                    ->where('fabric_asts.fabric_w', 'LIKE', '%'.$fabricW.'%');
             });
         }
 
         if (filled($fabricId)) {
-            $q2->where('fabricId','LIKE','%'.$fabricId.'%');
+            $q2->where('fabricId', 'LIKE', '%'.$fabricId.'%');
         }
 
         if (filled($orderId)) {
-            $q2->where('id','LIKE','%'.$orderId.'%');
+            $q2->where('id', 'LIKE', '%'.$orderId.'%');
         }
 
         if (filled($imDate)) {
             $dt = \DateTime::createFromFormat('d/m/Y', $imDate);
-            if ($dt) $q2->whereDate('createDate', $dt->format('Y-m-d'));
+            if ($dt) {
+                $q2->whereDate('createDate', $dt->format('Y-m-d'));
+            }
         }
 
-        // จัดอันดับให้ผลที่ "ใกล้" กว่า มาข้างหน้า: exact > startswith > contains
-        if (!empty($tokens)) {
-            $caseParts = [];
-            $bindings  = [];
-            foreach ($tokens as $t) {
-                $caseParts[] = "CASE WHEN $fsExpr = ? THEN 3 WHEN $fsExpr LIKE ? THEN 2 WHEN $fsExpr LIKE ? THEN 1 ELSE 0 END";
-                $bindings[] = $t;            // exact
-                $bindings[] = $t.'%';        // startswith
-                $bindings[] = '%'.$t.'%';    // contains
-            }
-            $orderScore = implode(' + ', $caseParts);
-            $importorder = $q2
-                ->orderByRaw("$orderScore DESC", $bindings)
-                ->orderBy('createDate','desc')
-                ->get();
-        } else {
-            $importorder = $q2->orderBy('createDate','desc')->get();
-        }
+        $importorder = $q2->orderBy('createDate','desc')->get();
     }
 
-    // ====== ข้อมูลเดิมที่ view ใช้ ======
+    // ====== คงตัวแปรประกอบที่ view ใช้อยู่เดิม ======
     $orders = AstPurchaseorder::select(
             'id','customerName','createDate','fabricId',
             'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
