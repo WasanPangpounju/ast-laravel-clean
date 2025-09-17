@@ -798,7 +798,32 @@ class FabricoutController extends Controller
                 if (isset($records[0]->fabricStructReplace)) {
                     $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStructReplace . ' '), 0, 0);
                 } else {
-                    $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStruct . ' ' . ' ' . $records[0]->fabricW . ' \'\' ' . (preg_match('/(\d+)\s*\/\s*(\d+)/', $records[0]->fabricPattern, $m) ? $m[1] . '/' . $m[2] : '') ), 0, 0);
+                    // เตรียมค่า fabricPattern
+$fabricPattern = $records[0]->fabricPattern;
+
+// ตัดข้อความในวงเล็บ ถ้ามี
+$fabricPattern = preg_replace('/\(.*?\)/', '', $fabricPattern);
+$fabricPattern = trim($fabricPattern);
+
+// ถ้าเป็น pattern แบบ 60/60 ให้ดึงเฉพาะตัวเลข
+$patternDisplay = (preg_match('/(\d+)\s*\/\s*(\d+)/', $records[0]->fabricPattern, $m) 
+                    ? $m[1] . '/' . $m[2] 
+                    : $fabricPattern);
+
+$this->fpdf->Cell(
+    60,
+    5,
+    iconv('UTF-8', 'cp874',
+        'รหัสผ้า Code : ' 
+        . $records[0]->fabricStruct . ' ' 
+        . $records[0]->fabricW . "'' " 
+        . $patternDisplay
+    ),
+    0,
+    0
+);
+
+                    // $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า Code : ' . $records[0]->fabricStruct . ' ' . ' ' . $records[0]->fabricW . ' \'\' ' . (preg_match('/(\d+)\s*\/\s*(\d+)/', $records[0]->fabricPattern, $m) ? $m[1] . '/' . $m[2] : '') ), 0, 0);
                     // $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า : ' . $records[0]->fabricStructReplace . ' '), 0, 0);
                 }
                 $this->fpdf->Cell(60, 10, '', 0, 0);
