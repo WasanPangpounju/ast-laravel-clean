@@ -801,15 +801,18 @@ class FabricoutController extends Controller
                     // เตรียมค่า fabricPattern
 $fabricPattern = $records[0]->fabricPattern;
 
-// ตัดข้อความในวงเล็บ ถ้ามี
-$fabricPattern = preg_replace('/\(.*?\)/', '', $fabricPattern);
-$fabricPattern = trim($fabricPattern);
+// 1) ตัดวงเล็บและข้อความข้างในออก เช่น "OXFORD (ใส่ลูกเบี้ยว 1/1)" -> "OXFORD"
+$cleanPattern = preg_replace('/\(.*?\)/', '', $fabricPattern);
+$cleanPattern = trim($cleanPattern);
 
-// ถ้าเป็น pattern แบบ 60/60 ให้ดึงเฉพาะตัวเลข
-$patternDisplay = (preg_match('/(\d+)\s*\/\s*(\d+)/', $records[0]->fabricPattern, $m) 
-                    ? $m[1] . '/' . $m[2] 
-                    : $fabricPattern);
+// 2) ถ้ามีตัวเลขรูปแบบ n/m อยู่ในข้อความ (ที่ไม่ใช่วงเล็บแล้ว) ให้ใช้
+if (preg_match('/(\d+)\s*\/\s*(\d+)/', $cleanPattern, $m)) {
+    $patternDisplay = $m[1] . '/' . $m[2];
+} else {
+    $patternDisplay = $cleanPattern;
+}
 
+// 3) ใช้ใน Cell
 $this->fpdf->Cell(
     60,
     5,
