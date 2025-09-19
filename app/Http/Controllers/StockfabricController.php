@@ -103,7 +103,6 @@ class StockfabricController extends Controller
 //     return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
 // }
 
-use Illuminate\Http\Request;
 
 public function index(Request $request)
 {
