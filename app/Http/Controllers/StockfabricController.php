@@ -40,69 +40,113 @@ class StockfabricController extends Controller
     //     // print_r($sumFabricout);
     //     return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
     // }
-//โค้ดใหม่แก้ให้ตัด stock ลูกค้า AST หาก ชื่อลูกค้าเป็นค่าว่าง
+// //โค้ดใหม่แก้ให้ตัด stock ลูกค้า AST หาก ชื่อลูกค้าเป็นค่าว่าง/*
+// public function index()
+// {
+//     // ---------- IN: stockfabrics (normalize customer -> customer_norm) ----------
+//     $sfSub = \DB::table('stockfabrics')
+//         ->selectRaw("
+//             fabricId,
+//             fabricStruct,
+//             fabricPattern,
+//             fabricW,
+//             COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer_norm,
+//             fold,
+//             sumYard,
+//             createDate
+//         ");
+
+//     $records = \DB::query()
+//         ->fromSub($sfSub, 's')
+//         ->selectRaw("
+//             fabricId,
+//             customer_norm AS customer,
+//             fabricStruct,
+//             fabricPattern,
+//             fabricW,
+//             COUNT(fold)  AS foldCount,
+//             SUM(sumYard) AS sumYardSum,
+//             MAX(createDate) AS lastDate
+//         ")
+//         ->groupBy('fabricStruct', 'fabricPattern', 'fabricW', 'customer', 'fabricId')
+//         ->orderByDesc('lastDate')
+//         ->get();
+
+//     $sumStockfabric = $records;
+
+//     // ---------- OUT: fabricouts (normalize customerName -> customer_norm) ----------
+//     $foSub = \DB::table('fabricouts')
+//         ->selectRaw("
+//             fabricStruct,
+//             fabricPattern,
+//             fabricW,
+//             COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer_norm,
+//             fold,
+//             sumYard
+//         ");
+
+//     $record2 = \DB::query()
+//         ->fromSub($foSub, 'o')
+//         ->selectRaw("
+//             customer_norm AS customer,
+//             fabricStruct,
+//             fabricPattern,
+//             fabricW,
+//             COUNT(fold)  AS foldCount,
+//             SUM(sumYard) AS sumYardSum
+//         ")
+//         ->groupBy('customer', 'fabricStruct', 'fabricPattern', 'fabricW')
+//         ->get();
+
+//     $sumFabricout = $record2;
+
+//     return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
+// }
+
 public function index()
 {
-    // ---------- IN: stockfabrics (normalize customer -> customer_norm) ----------
-    $sfSub = \DB::table('stockfabrics')
+    // IN: รวมตามคีย์ 4 ตัว + normalize ลูกค้าว่างเป็น AST
+    $sumStockfabric = \DB::table('stockfabrics')
         ->selectRaw("
-            fabricId,
             fabricStruct,
             fabricPattern,
             fabricW,
-            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer_norm,
-            fold,
-            sumYard,
-            createDate
-        ");
-
-    $records = \DB::query()
-        ->fromSub($sfSub, 's')
-        ->selectRaw("
-            fabricId,
-            customer_norm AS customer,
-            fabricStruct,
-            fabricPattern,
-            fabricW,
-            COUNT(fold)  AS foldCount,
-            SUM(sumYard) AS sumYardSum,
-            MAX(createDate) AS lastDate
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+            COUNT(DISTINCT fold) AS foldCount,
+            SUM(sumYard)         AS sumYardSum,
+            MAX(createDate)      AS lastDate
         ")
-        ->groupBy('fabricStruct', 'fabricPattern', 'fabricW', 'customer', 'fabricId')
+        ->groupBy('fabricStruct','fabricPattern','fabricW','customer')
         ->orderByDesc('lastDate')
         ->get();
 
-    $sumStockfabric = $records;
-
-    // ---------- OUT: fabricouts (normalize customerName -> customer_norm) ----------
-    $foSub = \DB::table('fabricouts')
+    // OUT: รวมตามคีย์ 4 ตัวเดียวกัน + normalize ลูกค้าว่างเป็น AST
+    $sumFabricout = \DB::table('fabricouts')
         ->selectRaw("
             fabricStruct,
             fabricPattern,
             fabricW,
-            COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer_norm,
-            fold,
-            sumYard
-        ");
-
-    $record2 = \DB::query()
-        ->fromSub($foSub, 'o')
-        ->selectRaw("
-            customer_norm AS customer,
-            fabricStruct,
-            fabricPattern,
-            fabricW,
-            COUNT(fold)  AS foldCount,
-            SUM(sumYard) AS sumYardSum
+            COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer,
+            COUNT(DISTINCT fold) AS foldCount,
+            SUM(sumYard)         AS sumYardSum
         ")
-        ->groupBy('customer', 'fabricStruct', 'fabricPattern', 'fabricW')
+        ->groupBy('fabricStruct','fabricPattern','fabricW','customer')
         ->get();
 
-    $sumFabricout = $record2;
+    // ทำดัชนี OUT ล่วงหน้า -> lookup O(1) ใน Blade
+    $outIndex = $sumFabricout->mapWithKeys(function ($r) {
+        $key = implode('|', [
+            $r->customer,
+            $r->fabricStruct,
+            $r->fabricPattern,
+            $r->fabricW,
+        ]);
+        return [$key => (float)$r->sumYardSum];
+    });
 
-    return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
+    return view('stockfabric.index', compact('sumStockfabric','sumFabricout','outIndex'));
 }
-
+//test
     /**
      * Show the form for creating a new resource.
      *
