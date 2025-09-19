@@ -103,9 +103,11 @@ class StockfabricController extends Controller
 //     return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
 // }
 
-public function index()
+public function index(\Illuminate\Http\Request $request)
 {
-    // IN: รวมตามคีย์ 4 ตัว + normalize ลูกค้าว่างเป็น AST
+    $perPage = (int)$request->input('per_page', 50);
+
+    // 1) IN: รวมตามคีย์ 4 ตัว + normalize ลูกค้าว่างเป็น AST + เพจจิเนต
     $sumStockfabric = \DB::table('stockfabrics')
         ->selectRaw("
             fabricStruct,
@@ -118,34 +120,45 @@ public function index()
         ")
         ->groupBy('fabricStruct','fabricPattern','fabricW','customer')
         ->orderByDesc('lastDate')
-        ->get();
+        ->paginate($perPage); // <<-- สำคัญ: ตัดเป็นหน้า
 
-    // OUT: รวมตามคีย์ 4 ตัวเดียวกัน + normalize ลูกค้าว่างเป็น AST
-    $sumFabricout = \DB::table('fabricouts')
-        ->selectRaw("
-            fabricStruct,
-            fabricPattern,
-            fabricW,
-            COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer,
-            COUNT(DISTINCT fold) AS foldCount,
-            SUM(sumYard)         AS sumYardSum
-        ")
-        ->groupBy('fabricStruct','fabricPattern','fabricW','customer')
-        ->get();
-
-    // ทำดัชนี OUT ล่วงหน้า -> lookup O(1) ใน Blade
-    $outIndex = $sumFabricout->mapWithKeys(function ($r) {
-        $key = implode('|', [
+    // 2) สร้างรายการ key ของ IN เฉพาะแถวในหน้านี้
+    $keys = collect($sumStockfabric->items())->map(function($r){
+        return implode('|', [
             $r->customer,
             $r->fabricStruct,
             $r->fabricPattern,
             $r->fabricW,
         ]);
-        return [$key => (float)$r->sumYardSum];
-    });
+    })->all();
 
-    return view('stockfabric.index', compact('sumStockfabric','sumFabricout','outIndex'));
+    // 3) OUT: รวมเฉพาะคีย์ที่อยู่ในหน้านี้เท่านั้น -> สร้างเป็นดัชนี O(1)
+    $outIndex = collect();
+    if (!empty($keys)) {
+        $outIndex = \DB::table('fabricouts')
+            ->selectRaw("
+                CONCAT_WS('|',
+                    COALESCE(NULLIF(TRIM(customerName), ''), 'AST'),
+                    fabricStruct,
+                    fabricPattern,
+                    fabricW
+                ) AS k,
+                SUM(sumYard) AS sumYardSum
+            ")
+            ->whereIn(\DB::raw("CONCAT_WS('|',
+                    COALESCE(NULLIF(TRIM(customerName), ''), 'AST'),
+                    fabricStruct,
+                    fabricPattern,
+                    fabricW
+                )"), $keys)
+            ->groupBy('k')
+            ->pluck('sumYardSum','k'); // ได้เป็น map: key => outQty
+    }
+
+    // 4) ส่งให้ blade เดิมใช้ต่อได้เลย
+    return view('stockfabric.index', compact('sumStockfabric','outIndex'));
 }
+
 //test
     /**
      * Show the form for creating a new resource.
