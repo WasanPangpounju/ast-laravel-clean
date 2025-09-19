@@ -104,9 +104,10 @@ class StockfabricController extends Controller
 // }
 
 
+
 public function index(Request $request)
 {
-    $perPage = (int) $request->input('per_page', 50);
+    $perPage = (int) $request->input('per_page', 20);
     @set_time_limit(60); // กันล้มชั่วคราวระหว่างทดสอบ
 
     // 1) รวม IN ตามคีย์ 4 ตัว + normalize ลูกค้าว่างเป็น 'AST'
@@ -115,48 +116,57 @@ public function index(Request $request)
             fabricStruct,
             fabricPattern,
             fabricW,
-            CASE WHEN TRIM(COALESCE(customer,''))='' THEN 'AST' ELSE TRIM(customer) END AS customer_norm,
+            CASE WHEN TRIM(COALESCE(customer,''))='' THEN 'AST' ELSE TRIM(customer) END AS customer,
             COUNT(DISTINCT fold) AS in_folds,
             SUM(sumYard)         AS in_qty,
-            MAX(createDate)      AS in_last
+            MAX(createDate)      AS lastDate
         ")
-        ->groupBy('fabricStruct','fabricPattern','fabricW','customer_norm');
+        ->groupBy('fabricStruct','fabricPattern','fabricW','customer');
 
-    // 2) เลือกหน้า + คำนวณ OUT ต่อแถวด้วย correlated subquery
-    $rows = \DB::query()
+    // 2) เอาหน้าปัจจุบัน
+    $sumStockfabric = \DB::query()
         ->fromSub($inAgg, 'i')
-        ->selectRaw("
-            i.fabricStruct,
-            i.fabricPattern,
-            i.fabricW,
-            i.customer_norm AS customer,
-            i.in_folds,
-            i.in_qty,
-            i.in_last AS lastDate,
-            (
-                SELECT SUM(fo.sumYard)
-                FROM fabricouts fo
-                WHERE
-                    (
-                        -- เคสลูกค้า 'AST' = ว่าง/NULL
-                        (i.customer_norm = 'AST' AND (fo.customerName IS NULL OR TRIM(fo.customerName) = ''))
-                        -- เคสลูกค้ามีชื่อ: เทียบแบบ trim ให้ตรง
-                        OR (i.customer_norm <> 'AST' AND TRIM(fo.customerName) = i.customer_norm)
-                    )
-                AND fo.fabricStruct  = i.fabricStruct
-                AND fo.fabricPattern = i.fabricPattern
-                AND fo.fabricW       = i.fabricW
-            ) AS out_qty
-        ")
-        ->orderByDesc('i.in_last')
+        ->select('i.*')
+        ->orderByDesc('i.lastDate')
         ->paginate($perPage);
 
-    // 3) ให้ Blade เดิมใช้ต่อ: วนจาก $sumStockfabric + lookup OUT ด้วย $outIndex
-    $sumStockfabric = $rows;
+    // 3) สร้างชุดค่า unique เฉพาะในหน้า
+    $pageItems = collect($sumStockfabric->items());
+    $custs     = $pageItems->pluck('customer')->unique()->values()->all();
+    $structs   = $pageItems->pluck('fabricStruct')->unique()->values()->all();
+    $patterns  = $pageItems->pluck('fabricPattern')->unique()->values()->all();
+    $widths    = $pageItems->pluck('fabricW')->unique()->values()->all();
 
-    $outIndex = collect($rows->items())->mapWithKeys(function($r){
+    // 4) ดึง OUT เฉพาะคีย์ในหน้า (ใช้ index ได้; เลี่ยง CONCAT ใน WHERE)
+    $outQuery = \DB::table('fabricouts')
+        ->selectRaw("
+            -- สร้าง customer_norm ฝั่ง OUT ใน SELECT (ไม่ใช้ใน WHERE)
+            CASE WHEN TRIM(COALESCE(customerName,''))='' THEN 'AST' ELSE TRIM(customerName) END AS customer,
+            fabricStruct,
+            fabricPattern,
+            fabricW,
+            SUM(sumYard) AS out_qty
+        ")
+        ->whereIn('fabricStruct',  $structs ?: [''])
+        ->whereIn('fabricPattern', $patterns ?: [''])
+        ->whereIn('fabricW',       $widths ?: [''])
+        ->where(function($q) use ($custs) {
+            $named = array_values(array_filter($custs, fn($c) => $c !== 'AST'));
+            if (!empty($named)) {
+                $q->whereIn(\DB::raw('TRIM(customerName)'), $named);
+            }
+            if (in_array('AST', $custs, true)) {
+                $q->orWhereNull('customerName')->orWhereRaw("TRIM(customerName)=''");
+            }
+        })
+        ->groupBy('customer','fabricStruct','fabricPattern','fabricW');
+
+    $outRows = $outQuery->get();
+
+    // 5) ทำดัชนี OUT สำหรับ lookup O(1)
+    $outIndex = $outRows->mapWithKeys(function($r){
         $key = implode('|', [$r->customer, $r->fabricStruct, $r->fabricPattern, $r->fabricW]);
-        return [$key => (float) ($r->out_qty ?? 0)];
+        return [$key => (float) $r->out_qty];
     });
 
     return view('stockfabric.index', compact('sumStockfabric','outIndex'));
