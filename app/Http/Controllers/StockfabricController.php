@@ -103,63 +103,67 @@ class StockfabricController extends Controller
 //     return view('stockfabric.index', compact('sumStockfabric', 'sumFabricout'));
 // }
 
-public function index(\Illuminate\Http\Request $request)
-{
-    $perPage = (int)$request->input('per_page', 50);
+use Illuminate\Http\Request;
 
-    // 1) IN: รวมตามคีย์ 4 ตัว + normalize ลูกค้าว่างเป็น AST + เพจจิเนต
-    $sumStockfabric = \DB::table('stockfabrics')
+public function index(Request $request)
+{
+    $perPage = (int) $request->input('per_page', 50);
+
+    // (ชั่วคราวกันล้มระหว่างทดสอบ – ปรับถาวรที่ php.ini ดีกว่า)
+    @set_time_limit(60);
+
+    // 1) รวม IN ตามคีย์ 4 ตัว + normalize ลูกค้าว่างเป็น 'AST'
+    $inAgg = \DB::table('stockfabrics')
         ->selectRaw("
             fabricStruct,
             fabricPattern,
             fabricW,
-            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
-            COUNT(DISTINCT fold) AS foldCount,
-            SUM(sumYard)         AS sumYardSum,
-            MAX(createDate)      AS lastDate
+            CASE WHEN TRIM(COALESCE(customer,''))='' THEN 'AST' ELSE TRIM(customer) END AS customer_norm,
+            COUNT(DISTINCT fold) AS in_folds,
+            SUM(sumYard)         AS in_qty,
+            MAX(createDate)      AS in_last
         ")
-        ->groupBy('fabricStruct','fabricPattern','fabricW','customer')
-        ->orderByDesc('lastDate')
-        ->paginate($perPage); // <<-- สำคัญ: ตัดเป็นหน้า
+        ->groupBy('fabricStruct','fabricPattern','fabricW','customer_norm');
 
-    // 2) สร้างรายการ key ของ IN เฉพาะแถวในหน้านี้
-    $keys = collect($sumStockfabric->items())->map(function($r){
-        return implode('|', [
-            $r->customer,
-            $r->fabricStruct,
-            $r->fabricPattern,
-            $r->fabricW,
-        ]);
-    })->all();
+    // 2) เลือกหน้า + คำนวณ OUT ต่อแถวด้วย correlated subquery (คิดเฉพาะแถวในหน้านั้น)
+    $rows = \DB::query()
+        ->fromSub($inAgg, 'i')
+        ->selectRaw("
+            i.fabricStruct,
+            i.fabricPattern,
+            i.fabricW,
+            i.customer_norm AS customer,
+            i.in_folds,
+            i.in_qty,
+            i.in_last AS lastDate,
+            (
+                SELECT SUM(fo.sumYard)
+                FROM fabricouts fo
+                WHERE
+                    -- จับคู่ลูกค้า: ว่าง/NULL ถือเป็น 'AST'
+                    (
+                        (fo.customerName IS NULL OR TRIM(fo.customerName) = '')
+                        AND i.customer = 'AST'
+                    )
+                    OR (TRIM(fo.customerName) = i.customer)
+                AND fo.fabricStruct  = i.fabricStruct
+                AND fo.fabricPattern = i.fabricPattern
+                AND fo.fabricW       = i.fabricW
+            ) AS out_qty
+        ")
+        ->orderByDesc('i.in_last')
+        ->paginate($perPage);
 
-    // 3) OUT: รวมเฉพาะคีย์ที่อยู่ในหน้านี้เท่านั้น -> สร้างเป็นดัชนี O(1)
-    $outIndex = collect();
-    if (!empty($keys)) {
-        $outIndex = \DB::table('fabricouts')
-            ->selectRaw("
-                CONCAT_WS('|',
-                    COALESCE(NULLIF(TRIM(customerName), ''), 'AST'),
-                    fabricStruct,
-                    fabricPattern,
-                    fabricW
-                ) AS k,
-                SUM(sumYard) AS sumYardSum
-            ")
-            ->whereIn(\DB::raw("CONCAT_WS('|',
-                    COALESCE(NULLIF(TRIM(customerName), ''), 'AST'),
-                    fabricStruct,
-                    fabricPattern,
-                    fabricW
-                )"), $keys)
-            ->groupBy('k')
-            ->pluck('sumYardSum','k'); // ได้เป็น map: key => outQty
-    }
+    // 3) ให้ Blade เดิมใช้ต่อได้: วนจาก $sumStockfabric และ lookup OUT ด้วย $outIndex
+    $sumStockfabric = $rows; // paginator เหมือนเดิม
+    $outIndex = collect($rows->items())->mapWithKeys(function($r){
+        $key = implode('|', [$r->customer, $r->fabricStruct, $r->fabricPattern, $r->fabricW]);
+        return [$key => (float) ($r->out_qty ?? 0)];
+    });
 
-    // 4) ส่งให้ blade เดิมใช้ต่อได้เลย
     return view('stockfabric.index', compact('sumStockfabric','outIndex'));
 }
 
-//test
     /**
      * Show the form for creating a new resource.
      *
