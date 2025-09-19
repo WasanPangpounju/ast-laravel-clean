@@ -107,9 +107,7 @@ class StockfabricController extends Controller
 public function index(Request $request)
 {
     $perPage = (int) $request->input('per_page', 50);
-
-    // (ชั่วคราวกันล้มระหว่างทดสอบ – ปรับถาวรที่ php.ini ดีกว่า)
-    @set_time_limit(60);
+    @set_time_limit(60); // กันล้มชั่วคราวระหว่างทดสอบ
 
     // 1) รวม IN ตามคีย์ 4 ตัว + normalize ลูกค้าว่างเป็น 'AST'
     $inAgg = \DB::table('stockfabrics')
@@ -124,7 +122,7 @@ public function index(Request $request)
         ")
         ->groupBy('fabricStruct','fabricPattern','fabricW','customer_norm');
 
-    // 2) เลือกหน้า + คำนวณ OUT ต่อแถวด้วย correlated subquery (คิดเฉพาะแถวในหน้านั้น)
+    // 2) เลือกหน้า + คำนวณ OUT ต่อแถวด้วย correlated subquery
     $rows = \DB::query()
         ->fromSub($inAgg, 'i')
         ->selectRaw("
@@ -139,12 +137,12 @@ public function index(Request $request)
                 SELECT SUM(fo.sumYard)
                 FROM fabricouts fo
                 WHERE
-                    -- จับคู่ลูกค้า: ว่าง/NULL ถือเป็น 'AST'
                     (
-                        (fo.customerName IS NULL OR TRIM(fo.customerName) = '')
-                        AND i.customer = 'AST'
+                        -- เคสลูกค้า 'AST' = ว่าง/NULL
+                        (i.customer_norm = 'AST' AND (fo.customerName IS NULL OR TRIM(fo.customerName) = ''))
+                        -- เคสลูกค้ามีชื่อ: เทียบแบบ trim ให้ตรง
+                        OR (i.customer_norm <> 'AST' AND TRIM(fo.customerName) = i.customer_norm)
                     )
-                    OR (TRIM(fo.customerName) = i.customer)
                 AND fo.fabricStruct  = i.fabricStruct
                 AND fo.fabricPattern = i.fabricPattern
                 AND fo.fabricW       = i.fabricW
@@ -153,8 +151,9 @@ public function index(Request $request)
         ->orderByDesc('i.in_last')
         ->paginate($perPage);
 
-    // 3) ให้ Blade เดิมใช้ต่อได้: วนจาก $sumStockfabric และ lookup OUT ด้วย $outIndex
-    $sumStockfabric = $rows; // paginator เหมือนเดิม
+    // 3) ให้ Blade เดิมใช้ต่อ: วนจาก $sumStockfabric + lookup OUT ด้วย $outIndex
+    $sumStockfabric = $rows;
+
     $outIndex = collect($rows->items())->mapWithKeys(function($r){
         $key = implode('|', [$r->customer, $r->fabricStruct, $r->fabricPattern, $r->fabricW]);
         return [$key => (float) ($r->out_qty ?? 0)];
