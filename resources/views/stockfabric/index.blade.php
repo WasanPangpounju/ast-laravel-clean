@@ -59,34 +59,37 @@
 </div>
 <form method="post" action="{{ route('stockfabric.store') }}" id="myForm">
 @csrf
-<input type="hidden" id="refId" name="refId" value="">
-<input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
 <div class="row">
-<div class="col-md-4">
-<div class="form-group">
-<label for="fabricStruct">โครงสร้างผ้า</label>
-@if (isset($backdata))
-<input type="text" name="fabricStruct" class="form-control" id="fabricStruct"
-placeholder="โครงสร้างผ้า" value="{{ $backdata->fabricStruct }}">
-@else
-<input type="text" name="fabricStruct" class="form-control" id="fabricStruct"
-placeholder="โครงสร้างผ้า">
-@endif
-</div>
-</div>
-<div class="col-md-4">
+<div class="col-md-2">
 <div class="form-group">
 <label for="customer">ลูกค้า</label>
-@if (isset($backdata))
-<input type="text" name="customer" class="form-control" id="customer"
-placeholder="ลูกค้า" value="{{ $backdata->customer }}">
-@else
-<input type="text" name="customer" class="form-control" id="customer"
-placeholder="ลูกค้า">
-@endif
+<input type="text" name="customer" class="form-control" id="customer" placeholder="ลูกค้า">
 </div>
 </div>
-<!--row-->
+<div class="col-md-2">
+<div class="form-group">
+<label for="fabricStruct">โครงสร้างผ้า</label>
+<input type="text" name="fabricStruct" class="form-control" id="fabricStruct" placeholder="โครงสร้างผ้า">
+</div>
+</div>
+<div class="col-md-2">
+<div class="form-group">
+<label for="fabricId">รหัสผ้า</label>
+<input type="text" name="fabricId" class="form-control" id="fabricId" placeholder="รหัสผ้า">
+</div>
+</div>
+<div class="col-md-2">
+<div class="form-group">
+<label for="fabricPattern">ลายผ้า</label>
+<input type="text" name="fabricPattern" class="form-control" id="fabricPattern" placeholder="ลายผ้า">
+</div>
+</div>
+<div class="col-md-2">
+<div class="form-group">
+<label for="fabricW">หน้ากว้าง</label>
+<input type="text" name="fabricW" class="form-control" id="fabricW" placeholder="หน้ากว้าง">
+</div>
+</div>
 <div class="col-md-2">
 <div class="form-group">
 <div class="text-right align-items-end" style="margin-top:1.5rem">
@@ -101,7 +104,7 @@ placeholder="ลูกค้า">
 </form>
 
         @php
-            // helper: ทำให้ * และ x เท่ากัน, ตัด 'undefined', จัดช่องว่างให้มาตรฐาน
+            // helper: normalize and clean up fabric structure string
             $fs_norm = function($s) {
                 $s = (string) $s;
                 $s = str_replace('undefined', '', $s);
@@ -153,13 +156,11 @@ placeholder="ลูกค้า">
                                 <td>
                                     <form method="post" action="{{ route('inventory.store') }}" id="myForm">
                                         @csrf
-                                        <input type="hidden" id="refId" name="refId" value="">
-                                        <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
-                                        <input type="hidden" name="fabricStruct" value="{{ $fs_norm($data->fabricStruct) }}" id="fabricStruct">
-                                        <input type="hidden" name="fabricPattern" value="{{ $data->fabricPattern }}" id="fabricPattern">
-                                        <input type="hidden" name="fabricW" value="{{ $data->fabricW }}" id="fabricW">
-                                        <input type="hidden" name="customer" value="{{ $data->customer }}" id="customer">
-                                        <input type="hidden" name="fabricId" value="{{ $data->fabricId }}" id="fabricId">
+                                        <input type="hidden" name="fabricStruct" value="{{ $data->fabricStruct }}">
+                                        <input type="hidden" name="fabricPattern" value="{{ $data->fabricPattern }}">
+                                        <input type="hidden" name="fabricW" value="{{ $data->fabricW }}">
+                                        <input type="hidden" name="customer" value="{{ $data->customer }}">
+                                        <input type="hidden" name="fabricId" value="{{ $data->fabricId }}">
                                         <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
                                     </form>
                                 </td>
@@ -172,7 +173,7 @@ placeholder="ลูกค้า">
         @elseif (isset($combinedData) && count($combinedData) === 0)
             <p>ไม่พบผลการค้นหา</p>
         @else
-            <p>กำลังโหลดข้อมูล...</p>
+            <p>กรุณาค้นหาข้อมูล</p>
         @endif
     </div>
 </div>
