@@ -1,7 +1,9 @@
 @extends('layouts.astmanufacturing')
 
 @section('content')
+
 <!-- Content Wrapper. Contains page content -->
+
 <div class="content-wrapper">
 <div class="">
 <ol class="breadcrumb">
@@ -98,165 +100,168 @@ placeholder="ลูกค้า">
 </div>
 </form>
 
-            @php
-                // helper: ทำให้ * และ x เท่ากัน, ตัด 'undefined', จัดช่องว่างให้มาตรฐาน
-                $fs_norm = function($s) {
-                    $s = (string) $s;
-                    $s = str_replace('undefined', '', $s);
-                    $s = preg_replace('/\s*([*x])\s*/i', ' x ', $s);
-                    $s = preg_replace('/\s+/', ' ', trim($s));
-                    return $s;
-                };
-            @endphp
+        @php
+            // helper: ทำให้ * และ x เท่ากัน, ตัด 'undefined', จัดช่องว่างให้มาตรฐาน
+            $fs_norm = function($s) {
+                $s = (string) $s;
+                $s = str_replace('undefined', '', $s);
+                $s = preg_replace('/\s*([*x])\s*/i', ' x ', $s);
+                $s = preg_replace('/\s+/', ' ', trim($s));
+                return $s;
+            };
+        @endphp
 
-            @if (isset($combinedData) && count($combinedData) > 0)
-                <div class="row">
-                    <div class="col-12 table-responsive">
-                        <table class="table table-bordered table-a" style="width:100%">
-                            <thead style="position: sticky;top: 0;background-color:powderblue;">
+        @if (isset($combinedData) && count($combinedData) > 0)
+            <div class="row">
+                <div class="col-12 table-responsive">
+                    <table class="table table-bordered table-a" style="width:100%">
+                        <thead style="position: sticky;top: 0;background-color:powderblue;">
+                        <tr>
+                            <th rowspan="2">ลูกค้า </th>
+                            <th rowspan="2">โครงสร้างผ้า </th>
+                            <th rowspan="2">รหัสผ้า </th>
+                            <th rowspan="2">ลายผ้า </th>
+                            <th rowspan="2">หน้ากว้าง</th>
+                            <th colspan="2">ผลิตแล้ว </th>
+                            <th colspan="2">ใช้ไป </th>
+                            <th colspan="2">คงเหลือ</th>
+                            <th rowspan="2">ส่งออร์เดอร์</th>
+                        </tr>
+                        <tr>
+                            <th>จำนวนพับ </th>
+                            <th>จำนวนหลา </th>
+                            <th>จำนวนพับ </th>
+                            <th>จำนวนหลา </th>
+                            <th>จำนวนพับ </th>
+                            <th>จำนวนหลา </th>
+                        </tr>
+                        </thead>
+                        <tbody style="text-align: right;">
+                        @foreach ($combinedData as $data)
                             <tr>
-                                <th rowspan="2">ลูกค้า </th>
-                                <th rowspan="2">โครงสร้างผ้า </th>
-                                <th rowspan="2">ลายผ้า </th>
-                                <th rowspan="2">หน้ากว้าง</th>
-                                <th colspan="2">ผลิตแล้ว </th>
-                                <th colspan="2">ใช้ไป </th>
-                                <th colspan="2">คงเหลือ</th>
-                                <th rowspan="2">ส่งออร์เดอร์</th>
+                                <td>{{ $data->customer }}</td>
+                                <td>{{ $fs_norm($data->fabricStruct) }}</td>
+                                <td>{{ $data->fabricId }}</td>
+                                <td>{{ $data->fabricPattern }}</td>
+                                <td>{{ $data->fabricW }}</td>
+                                <td>{{ $data->foldCountIn }}</td>
+                                <td>{{ $data->sumYardIn }}</td>
+                                <td>{{ $data->foldCountOut }}</td>
+                                <td>{{ $data->sumYardOut }}</td>
+                                <td>{{ $data->foldCountRemaining }}</td>
+                                <td>{{ $data->sumYardRemaining }}</td>
+                                <td>
+                                    <form method="post" action="{{ route('inventory.store') }}" id="myForm">
+                                        @csrf
+                                        <input type="hidden" id="refId" name="refId" value="">
+                                        <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
+                                        <input type="hidden" name="fabricStruct" value="{{ $fs_norm($data->fabricStruct) }}" id="fabricStruct">
+                                        <input type="hidden" name="fabricPattern" value="{{ $data->fabricPattern }}" id="fabricPattern">
+                                        <input type="hidden" name="fabricW" value="{{ $data->fabricW }}" id="fabricW">
+                                        <input type="hidden" name="customer" value="{{ $data->customer }}" id="customer">
+                                        <input type="hidden" name="fabricId" value="{{ $data->fabricId }}" id="fabricId">
+                                        <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
+                                    </form>
+                                </td>
                             </tr>
-                            <tr>
-                                <th>จำนวนพับ </th>
-                                <th>จำนวนหลา </th>
-                                <th>จำนวนพับ </th>
-                                <th>จำนวนหลา </th>
-                                <th>จำนวนพับ </th>
-                                <th>จำนวนหลา </th>
-                            </tr>
-                            </thead>
-                            <tbody style="text-align: right;">
-                            @foreach ($combinedData as $data)
-                                <tr>
-                                    <td>{{ $data->customer }}</td>
-                                    <td>{{ $fs_norm($data->fabricStruct) }}</td>
-                                    <td>{{ $data->fabricPattern }}</td>
-                                    <td>{{ $data->fabricW }}</td>
-                                    <td>{{ $data->foldCountIn }}</td>
-                                    <td>{{ $data->sumYardIn }}</td>
-                                    <td>{{ $data->foldCountOut }}</td>
-                                    <td>{{ $data->sumYardOut }}</td>
-                                    <td>{{ $data->foldCountRemaining }}</td>
-                                    <td>{{ $data->sumYardRemaining }}</td>
-                                    <td>
-                                        <form method="post" action="{{ route('inventory.store') }}" id="myForm">
-                                            @csrf
-                                            <input type="hidden" id="refId" name="refId" value="">
-                                            <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
-                                            <input type="hidden" name="fabricStruct" value="{{ $fs_norm($data->fabricStruct) }}" id="fabricStruct">
-                                            <input type="hidden" name="fabricPattern" value="{{ $data->fabricPattern }}" id="fabricPattern">
-                                            <input type="hidden" name="fabricW" value="{{ $data->fabricW }}" id="fabricW">
-                                            <input type="hidden" name="customer" value="{{ $data->customer }}" id="customer">
-                                            <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                        @endforeach
+                        </tbody>
+                    </table>
                 </div>
-            @elseif (isset($combinedData) && count($combinedData) === 0)
-                <p>ไม่พบผลการค้นหา</p>
-            @else
-                <p>กำลังโหลดข้อมูล...</p>
-            @endif
-        </div>
+            </div>
+        @elseif (isset($combinedData) && count($combinedData) === 0)
+            <p>ไม่พบผลการค้นหา</p>
+        @else
+            <p>กำลังโหลดข้อมูล...</p>
+        @endif
     </div>
 </div>
-<script>
-    function yd(valNum) {
-        var m = (valNum * 0.9144).toFixed(4);
-        document.getElementById('sumM').value = m;
-    }
-    function ydToM(valNum) {
-        var yd = (valNum / 0.9144).toFixed(4);
-        document.getElementById('sumYard').value = yd;
-    }
-    function pToYd(valNum) {
-        var orderyd = document.getElementById('orderSumYard').value;
-        let ordernum = parseInt(orderyd);
-        var sppYd = ((orderyd * (valNum / 100)) + ordernum).toFixed(4);
-        document.getElementById('fabricSpy').value = sppYd;
-    }
-    function ydToP(valNum) {
-        var orderp = document.getElementById('orderSumYard').value;
-        var sppP = (orderp / valNum).toFixed(4);
-        document.getElementById('fabricSPY').value = sppP;
-    }
-    function priceToM(valNum) {
-        var orderp = document.getElementById('orderSumM').value;
-        var sumPriceP = orderp * valNum;
-        var pyd = (sumPriceP / (orderp * 0.9144)).toFixed(2);
-        document.getElementById('priceM').value = pyd;
-    }
-    function priceToY(valNum) {
-        var orderyd = document.getElementById('orderSumYard').value;
-        var sumPriceYd = orderyd * valNum;
-        var pm = (sumPriceYd / (orderyd / 0.9144)).toFixed(2);
-        document.getElementById('priceYard').value = pm;
-    }
-    function discountToPriceYd(valNum) {
-        var pyd = document.getElementById('priceYard').value;
-        var discountYd = ((pyd * valNum) / 100).toFixed(2);
-        document.getElementById('discountYard').value = discountYd;
-    }
-    function discountToPriceP(valNum) {
-        var pyd = document.getElementById('priceYard').value;
-        var discountP = ((valNum * 100) / pyd).toFixed(2);
-        document.getElementById('discountP').value = discountP;
-    }
-</script>
-<script>
-    var input, filter, ul, li, a, i, txtValue;
-    ul = document.getElementById("supp");
-    li = ul.getElementsByTagName("li");
-    for (i = 0; i < li.length; i++) {
-        li[i].style.display = "none";
-    }
-</script>
-<script>
-    function supplierFunction(id) {
-        var input, filter, ul, li, a, i, txtValue;
-        input = document.getElementById('orderId');
-        filter = input.value.toUpperCase();
-        ul = document.getElementById("supp");
-        li = ul.getElementsByTagName("li");
-        for (i = 0; i < li.length; i++) {
-            if (filter == "") {
-                for (i = 0; i < li.length; i++) {
-                    li[i].style.display = "none";
-                }
-                break;
-            }
-            a = li[i].getElementsByTagName("a")[0];
-            txtValue = a.textContent || a.innerText;
-            if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                li[i].style.display = "";
-            } else {
-                li[i].style.display = "none";
-            }
-        }
-    }
-    function setOrderIdFunction(t, t1, t2, t3, t4) {
-        document.getElementById("orderId").value = t1;
-        document.getElementById("fabricId").value = t2;
-        document.getElementById("fabricStruct").value = t3;
-        document.getElementById("refId").value = t4;
-        ul = document.getElementById('supp');
-        li = ul.getElementsByTagName("li");
-        for (i = 0; i < li.length; i++) {
-            li[i].style.display = "none";
-        }
-    }
-</script>
 
+</div>
+<script>
+function yd(valNum) {
+var m = (valNum * 0.9144).toFixed(4);
+document.getElementById('sumM').value = m;
+}
+function ydToM(valNum) {
+var yd = (valNum / 0.9144).toFixed(4);
+document.getElementById('sumYard').value = yd;
+}
+function pToYd(valNum) {
+var orderyd = document.getElementById('orderSumYard').value;
+let ordernum = parseInt(orderyd);
+var sppYd = ((orderyd * (valNum / 100)) + ordernum).toFixed(4);
+document.getElementById('fabricSpy').value = sppYd;
+}
+function ydToP(valNum) {
+var orderp = document.getElementById('orderSumYard').value;
+var sppP = (orderp / valNum).toFixed(4);
+document.getElementById('fabricSPY').value = sppP;
+}
+function priceToM(valNum) {
+var orderp = document.getElementById('orderSumM').value;
+var sumPriceP = orderp * valNum;
+var pyd = (sumPriceP / (orderp * 0.9144)).toFixed(2);
+document.getElementById('priceM').value = pyd;
+}
+function priceToY(valNum) {
+var orderyd = document.getElementById('orderSumYard').value;
+var sumPriceYd = orderyd * valNum;
+var pm = (sumPriceYd / (orderyd / 0.9144)).toFixed(2);
+document.getElementById('priceYard').value = pm;
+}
+function discountToPriceYd(valNum) {
+var pyd = document.getElementById('priceYard').value;
+var discountYd = ((pyd * valNum) / 100).toFixed(2);
+document.getElementById('discountYard').value = discountYd;
+}
+function discountToPriceP(valNum) {
+var pyd = document.getElementById('priceYard').value;
+var discountP = ((valNum * 100) / pyd).toFixed(2);
+document.getElementById('discountP').value = discountP;
+}
+</script>
+<script>
+var input, filter, ul, li, a, i, txtValue;
+ul = document.getElementById("supp");
+li = ul.getElementsByTagName("li");
+for (i = 0; i < li.length; i++) {
+li[i].style.display = "none";
+}
+</script>
+<script>
+function supplierFunction(id) {
+var input, filter, ul, li, a, i, txtValue;
+input = document.getElementById('orderId');
+filter = input.value.toUpperCase();
+ul = document.getElementById("supp");
+li = ul.getElementsByTagName("li");
+for (i = 0; i < li.length; i++) {
+if (filter == "") {
+for (i = 0; i < li.length; i++) {
+li[i].style.display = "none";
+}
+break;
+}
+a = li[i].getElementsByTagName("a")[0];
+txtValue = a.textContent || a.innerText;
+if (txtValue.toUpperCase().indexOf(filter) > -1) {
+li[i].style.display = "";
+} else {
+li[i].style.display = "none";
+}
+}
+}
+function setOrderIdFunction(t, t1, t2, t3, t4) {
+document.getElementById("orderId").value = t1;
+document.getElementById("fabricId").value = t2;
+document.getElementById("fabricStruct").value = t3;
+document.getElementById("refId").value = t4;
+ul = document.getElementById('supp');
+li = ul.getElementsByTagName("li");
+for (i = 0; i < li.length; i++) {
+li[i].style.display = "none";
+}
+}
+</script>
 @endsection

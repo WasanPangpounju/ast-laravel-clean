@@ -15,7 +15,7 @@ class StockfabricController extends Controller
 
     public function index()
     {
-        // ---------- ดึงข้อมูลสต็อกผ้าเข้า (IN) ----------
+        // Get stock-in data
         $stockIns = \DB::table('stockfabrics')
             ->selectRaw("
                 COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
@@ -28,7 +28,7 @@ class StockfabricController extends Controller
             ->groupBy('customer', 'fabricStruct', 'fabricPattern', 'fabricW')
             ->get();
 
-        // ---------- ดึงข้อมูลสต็อกผ้าออก (OUT) ----------
+        // Get stock-out data
         $stockOuts = \DB::table('fabricouts')
             ->selectRaw("
                 COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer,
@@ -41,7 +41,7 @@ class StockfabricController extends Controller
             ->groupBy('customer', 'fabricStruct', 'fabricPattern', 'fabricW')
             ->get();
 
-        // ---------- รวมข้อมูลทั้งสองเป็นตารางเดียวและคำนวณยอดคงเหลือ ----------
+        // Combine both data sets and calculate remaining stock
         $combinedData = $stockIns->map(function ($in) use ($stockOuts) {
             $out = $stockOuts->first(function ($o) use ($in) {
                 return $o->customer == $in->customer &&
@@ -50,7 +50,6 @@ class StockfabricController extends Controller
                        $o->fabricW == $in->fabricW;
             });
 
-            // สร้าง Object สำหรับแถวในตาราง
             return (object)[
                 'customer' => $in->customer,
                 'fabricStruct' => $in->fabricStruct,
@@ -65,30 +64,90 @@ class StockfabricController extends Controller
             ];
         });
 
-        // ส่งข้อมูลที่ประมวลผลแล้วไปยัง View
         return view('stockfabric.index', compact('combinedData'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     * ...
-     */
-     public function store(Request $request)
-     {
-         // โค้ดส่วนนี้ไม่ได้แก้ไข
-         if ($request->filled('submit') && $request->submit == 'searchImport') {
-             $importorder = StockFabric::where('fabricStruct', 'LIKE', '%' . $request->fabricStruct . '%')
-                 ->groupBy(['fabricId','fabricStruct', 'fabricPattern', 'fabricW', 'createDate', 'customer','fabricId'])
-                 ->selectRaw('customer,fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum,createDate')
-                 ->orderBy('createDate', 'desc')
-                 ->get();
+    public function store(Request $request)
+    {
+        // searchImport
+        if ($request->filled('submit') && $request->submit == 'searchImport') {
 
-             $record2 = fabricout::groupBy(['fabricStruct', 'fabricPattern', 'fabricW'])
-                 ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
-                 ->get();
-             // ส่งข้อมูลที่ประมวลผลแล้วไปยัง View
-             return view('stockfabric.index', compact('importorder', 'sumFabricout'));
-         }
-         // ...
-     }
+            // Get all data from stockfabrics and fabricouts
+            $stockIns = \DB::table('stockfabrics')
+                ->selectRaw("
+                    COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+                    fabricId,
+                    fabricStruct,
+                    fabricPattern,
+                    fabricW,
+                    COUNT(fold) as foldCountIn,
+                    SUM(sumYard) as sumYardIn
+                ")
+                ->groupBy('customer', 'fabricId', 'fabricStruct', 'fabricPattern', 'fabricW')
+                ->get();
+
+            $stockOuts = \DB::table('fabricouts')
+                ->selectRaw("
+                    COALESCE(NULLIF(TRIM(customerName), ''), 'AST') AS customer,
+                    fabricStruct,
+                    fabricPattern,
+                    fabricW,
+                    COUNT(fold) as foldCountOut,
+                    SUM(sumYard) as sumYardOut
+                ")
+                ->groupBy('customer', 'fabricStruct', 'fabricPattern', 'fabricW')
+                ->get();
+
+            // Filter data based on search criteria from the form
+            $filteredIns = $stockIns->filter(function ($in) use ($request) {
+                $fs_norm = function($s) { return preg_replace('/\s+/', ' ', trim((string) $s)); };
+                
+                // Perform a precise search based on all four fields
+                $isMatch = true;
+                if ($request->filled('customer') && $in->customer !== $request->customer) {
+                    $isMatch = false;
+                }
+                if ($request->filled('fabricStruct') && $fs_norm($in->fabricStruct) !== $fs_norm($request->fabricStruct)) {
+                    $isMatch = false;
+                }
+                if ($request->filled('fabricPattern') && $in->fabricPattern !== $request->fabricPattern) {
+                    $isMatch = false;
+                }
+                if ($request->filled('fabricW') && $in->fabricW !== $request->fabricW) {
+                    $isMatch = false;
+                }
+                if ($request->filled('fabricId') && $in->fabricId !== $request->fabricId) {
+                    $isMatch = false;
+                }
+                
+                return $isMatch;
+            });
+
+            // Combine filtered data sets and calculate remaining stock
+            $combinedData = $filteredIns->map(function ($in) use ($stockOuts) {
+                $out = $stockOuts->first(function ($o) use ($in) {
+                    return $o->customer == $in->customer &&
+                           $o->fabricStruct == $in->fabricStruct &&
+                           $o->fabricPattern == $in->fabricPattern &&
+                           $o->fabricW == $in->fabricW;
+                });
+
+                return (object)[
+                    'customer' => $in->customer,
+                    'fabricStruct' => $in->fabricStruct,
+                    'fabricId' => $in->fabricId,
+                    'fabricPattern' => $in->fabricPattern,
+                    'fabricW' => $in->fabricW,
+                    'foldCountIn' => $in->foldCountIn,
+                    'sumYardIn' => $in->sumYardIn,
+                    'foldCountOut' => $out ? $out->foldCountOut : 0,
+                    'sumYardOut' => $out ? $out->sumYardOut : 0,
+                    'foldCountRemaining' => $in->foldCountIn - ($out ? $out->foldCountOut : 0),
+                    'sumYardRemaining' => $in->sumYardIn - ($out ? $out->sumYardOut : 0),
+                ];
+            });
+
+             return view('stockfabric.index', compact('combinedData'));
+        }
+    }
 }
