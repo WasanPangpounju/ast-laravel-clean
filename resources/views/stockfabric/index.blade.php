@@ -237,16 +237,8 @@
                                     @for ($i = 0; $i < $c; $i++)
                                         @for ($j = 0; $j < $a; $j++)
                                             <?php $check = 0; ?>
-                                            <!-- <?php if ($fs_norm($sumStockfabric[$i]->fabricStruct) === $fs_norm($sumFabricout[$j]->fabricStruct)) { ?> -->
-<?php
-$is_match =
-    ($fs_norm($sumStockfabric[$i]->fabricStruct) === $fs_norm($sumFabricout[$j]->fabricStruct)) &&
-    ($sumStockfabric[$i]->fabricPattern === $sumFabricout[$j]->fabricPattern) &&
-    ($sumStockfabric[$i]->fabricW === $sumFabricout[$j]->fabricW) &&
-    ($sumStockfabric[$i]->customer === $sumFabricout[$j]->customer);
-
-if ($is_match) {
-?>
+                                            <?php if ($fs_norm($sumStockfabric[$i]->fabricStruct) === $fs_norm($sumFabricout[$j]->fabricStruct)) { ?>
+                                                
                                                 <?php $check = 1; ?>
                                                 <tr>
                                                     <td>{{ $sumStockfabric[$i]->customer }}</td>
