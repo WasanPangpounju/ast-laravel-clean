@@ -41,6 +41,7 @@ class StockfabricController extends Controller
             $combinedData = $this->getCombinedData(
                 $request->get('customer'),
                 $request->get('fabricStruct'),
+                $request->get('fabricId'),
                 $request->get('fabricPattern'),
                 $request->get('fabricW')
             );
@@ -54,11 +55,12 @@ class StockfabricController extends Controller
      *
      * @param string|null $customer
      * @param string|null $fabricStruct
+     * @param string|null $fabricId
      * @param string|null $fabricPattern
      * @param string|null $fabricW
      * @return \Illuminate\Support\Collection
      */
-    private function getCombinedData($customer = null, $fabricStruct = null, $fabricPattern = null, $fabricW = null)
+    private function getCombinedData($customer = null, $fabricStruct = null, $fabricId = null, $fabricPattern = null, $fabricW = null)
     {
         // Base query for stock-in data
         $stockInsQuery = \DB::table('stockfabrics')
@@ -79,6 +81,9 @@ class StockfabricController extends Controller
         }
         if ($fabricStruct) {
             $stockInsQuery->where('fabricStruct', 'like', '%' . $fabricStruct . '%');
+        }
+        if ($fabricId) {
+            $stockInsQuery->where('fabricId', 'like', '%' . $fabricId . '%');
         }
         if ($fabricPattern) {
             $stockInsQuery->where('fabricPattern', 'like', '%' . $fabricPattern . '%');
