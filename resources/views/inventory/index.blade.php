@@ -214,7 +214,7 @@
                                                         <?php $check = 0; ?>
                                                         @for ($z = 0; $z < count($fabricoutdata2); $z++)
                                                             @if ($fabricoutdata2[$z]->purchaseOrder == $withorders1->id)
-                                                                <td>{{ $fabricoutdata2[$z]->fabric_w }}
+                                                                <td>{{ $fabricoutdata2[$z]->fabric_w }}</td>
                                                                     <?php $check = 1; ?>
                                                             @endif
                                                         @endfor
@@ -445,6 +445,8 @@
                                                             @csrf
                                                             <input type="hidden" name="orderId"
                                                                 value="{{ $withorders1->id }}">
+                                                            <input type="hidden" name="purchaseOrder"
+                                                                value="{{ $withorders1->purchaseOrder }}                                                        ">
                                                             <input type="hidden" name="customerName"
                                                                 value="{{ $withorders1->customerName }}                                                        ">
                                                             <input type="hidden" name="fabricStruct"
