@@ -509,7 +509,7 @@
                                                 @endif
                                             @endfor
                                             @if ($check == 0)
-                                                <td></td>
+                                                <td>x</td>
                                             @endif
                                             <td>
                                                 <a
@@ -532,7 +532,7 @@
                                                     <button name="submit" value="generateByOrder"
                                                         class="btn b_save">
                                                         {{-- <img src="<?php echo asset('assets/images/circle-check-solid.png'); ?>" width="17"> --}}
-                                                        xจัดส่งสินค้า</button>
+                                                        จัดส่งสินค้า</button>
                                                 </form>
                                             </td>
                                         </tr>
