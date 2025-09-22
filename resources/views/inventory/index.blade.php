@@ -485,7 +485,7 @@
                                             @if ($check == 0)
                                                 <td></td>
                                             @endif
-                                            <td>{{ $withorders1->orderSumYard }}</td>
+                                            <td>x{{ $withorders1->orderSumYard }}</td>
 
                                             <?php $check = 0; ?>
                                             @for ($z = 0; $z < count($fabricoutdata); $z++)
