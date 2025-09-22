@@ -362,7 +362,7 @@
                             <table class="table table-bordered table-a">
                                 <thead style="position: sticky;top: 0">
                                     <tr>
-                                        <th rowspan="2">xวันที่ </th>
+                                        <th rowspan="2">วันที่ </th>
                                         <th rowspan="2">SO/ลูกค้า </th>
                                         <th rowspan="2">รหัสผ้า</th>
                                         <th rowspan="2">โครงสร้างผ้า</th>
@@ -420,8 +420,8 @@
                                                         @endif
                                                     @endfor
                                                     @if ($check == 0)
-                                                        <td></td>
-                                                        <td></td>
+                                                        <td>x</td>
+                                                        <td>y</td>
                                                     @endif
 
                                                     <?php $check = 0; ?>
