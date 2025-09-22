@@ -288,7 +288,7 @@
                                                 <?php $check = 0; ?>
                                                 @for ($z = 0; $z < count($fabricoutdata2); $z++)
                                                     @if ($fabricoutdata2[$z]->purchaseOrder == $withorders1->id)
-                                                        <td>{{ $fabricoutdata2[$z]->fabric_w }}
+                                                        <td>{{ $fabricoutdata2[$z]->fabric_w }}</td>
                                                             <?php $check = 1; ?>
                                                     @endif
                                                 @endfor
@@ -485,7 +485,7 @@
                                             @if ($check == 0)
                                                 <td></td>
                                             @endif
-                                            <td>x{{ $withorders1->orderSumYard }}</td>
+                                            <td>{{ $withorders1->orderSumYard }}</td>
 
                                             <?php $check = 0; ?>
                                             @for ($z = 0; $z < count($fabricoutdata); $z++)
@@ -496,8 +496,8 @@
                                                 @endif
                                             @endfor
                                             @if ($check == 0)
-                                                <td>ป</td>
-                                                <td>ผ</td>
+                                                <td></td>
+                                                <td></td>
                                             @endif
 
                                             <?php $check = 0; ?>
