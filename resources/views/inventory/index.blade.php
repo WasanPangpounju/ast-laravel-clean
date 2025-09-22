@@ -483,7 +483,7 @@
                                                 @endif
                                             @endfor
                                             @if ($check == 0)
-                                                <td></td>
+                                                <td>x</td>
                                             @endif
                                             <td>{{ $withorders1->orderSumYard }}</td>
 
@@ -496,8 +496,8 @@
                                                 @endif
                                             @endfor
                                             @if ($check == 0)
-                                                <td>x</td>
-                                                <tdy></tdy>
+                                                <td></td>
+                                                <td></td>
                                             @endif
 
                                             <?php $check = 0; ?>
