@@ -496,8 +496,8 @@
                                                 @endif
                                             @endfor
                                             @if ($check == 0)
-                                                <td></td>
-                                                <td></td>
+                                                <td>x</td>
+                                                <tdy></tdy>
                                             @endif
 
                                             <?php $check = 0; ?>
@@ -509,7 +509,7 @@
                                                 @endif
                                             @endfor
                                             @if ($check == 0)
-                                                <td>x</td>
+                                                <td></td>
                                             @endif
                                             <td>
                                                 <a
