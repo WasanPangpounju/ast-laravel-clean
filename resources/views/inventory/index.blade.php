@@ -219,7 +219,7 @@
                                                             @endif
                                                         @endfor
                                                         @if ($check == 0)
-                                                            <td></td>
+                                                            <td>x</td>
                                                         @endif
                                                         <td>{{ $withorders1->orderSumYard }}</td>
 
