@@ -420,8 +420,8 @@
                                                         @endif
                                                     @endfor
                                                     @if ($check == 0)
-                                                        <td>x</td>
-                                                        <td>y</td>
+                                                        <td></td>
+                                                        <td></td>
                                                     @endif
 
                                                     <?php $check = 0; ?>
@@ -532,7 +532,7 @@
                                                     <button name="submit" value="generateByOrder"
                                                         class="btn b_save">
                                                         {{-- <img src="<?php echo asset('assets/images/circle-check-solid.png'); ?>" width="17"> --}}
-                                                        จัดส่งสินค้า</button>
+                                                        xจัดส่งสินค้า</button>
                                                 </form>
                                             </td>
                                         </tr>
