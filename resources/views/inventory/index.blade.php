@@ -221,7 +221,7 @@
                                                         @if ($check == 0)
                                                             <td></td>
                                                         @endif
-                                                        <td>{{ $withorders1->orderSumYard }}</td>
+                                                        <td>ป {{ $withorders1->orderSumYard }}</td>
 
                                                         <?php $check = 0; ?>
                                                         @for ($j = 0; $j < count($fabricoutdata); $j++)
@@ -295,7 +295,7 @@
                                                 @if ($check == 0)
                                                     <td></td>
                                                 @endif
-                                                <td>{{ $withorders1->orderSumYard }}</td>
+                                                <td>ก {{ $withorders1->orderSumYard }}</td>
 
                                                 <?php $check = 0; ?>
                                                 @for ($z = 0; $z < count($fabricoutdata); $z++)
@@ -409,7 +409,7 @@
                                                     @if ($check == 0)
                                                         <td></td>
                                                     @endif
-                                                    <td>{{ $withorders1->orderSumYard }}</td>
+                                                    <td>ผ {{ $withorders1->orderSumYard }}</td>
 
                                                     <?php $check = 0; ?>
                                                     @for ($j = 0; $j < count($fabricoutdata); $j++)
