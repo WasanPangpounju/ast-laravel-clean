@@ -74,9 +74,9 @@ class InventoryController extends Controller
             return $order;
         });
 
-        print_r($orders->fabricId);
+        // print_r($orders->fabricId);
 
-        // return view('inventory.index', compact('orders', 'inventorydata', 'fabricoutdata', 'fabricoutdata2'));
+        return view('inventory.index', compact('orders', 'inventorydata', 'fabricoutdata', 'fabricoutdata2'));
     }
 
     /**
