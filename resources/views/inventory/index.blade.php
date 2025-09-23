@@ -216,6 +216,7 @@
                                                             @if ($fabricoutdata2[$z]->purchaseOrder == $withorders1->id)
                                                                 <td>{{ $fabricoutdata2[$z]->fabric_w }}</td>
                                                                     <?php $check = 1; ?>
+                                                                        @break
                                                             @endif
                                                         @endfor
                                                         @if ($check == 0)
@@ -290,6 +291,7 @@
                                                     @if ($fabricoutdata2[$z]->purchaseOrder == $withorders1->id)
                                                         <td>{{ $fabricoutdata2[$z]->fabric_w }}</td>
                                                             <?php $check = 1; ?>
+                                                                @break
                                                     @endif
                                                 @endfor
                                                 @if ($check == 0)
