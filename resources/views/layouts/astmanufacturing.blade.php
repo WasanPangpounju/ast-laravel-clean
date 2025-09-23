@@ -283,6 +283,12 @@
                                         <p>คีย์ผ้าเข้าสต็อก</p>
                                     </a>
                                 </li>
+                                                                <li class="nav-item">
+                                    <a href="{{ route('fabricimport.create') }}" class="nav-link"><i
+                                            class="far fa-circle nav-icon"></i>
+                                        <p>คีย์ผ้าซื้อเข้า</p>
+                                    </a>
+                                </li>
                                 <li class="nav-item">
                                     <a href="{{ route('fabricout.create') }}" class="nav-link"><i
                                             class="far fa-circle nav-icon"></i>
