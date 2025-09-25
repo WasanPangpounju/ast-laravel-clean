@@ -157,7 +157,6 @@ class InventoryController extends Controller
     {
         //
         //searchImport
-print_r($request->input);
 
         if ($request->filled('submit') && $request->submit == 'searchImport') {
 
@@ -321,9 +320,9 @@ print_r($request->input);
     $select_search = '';
     $searchInput   = '';
 
-    // return view('inventory.index', compact(
-    //     'importorder','select_search','inventorydata','fabricoutdata','fabricoutdata2','orders'
-    // ));
+    return view('inventory.index', compact(
+        'importorder','select_search','inventorydata','fabricoutdata','fabricoutdata2','orders'
+    ));
 }
 
         //check next data then save and set end count to session  and show create with end count

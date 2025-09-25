@@ -399,8 +399,8 @@ class FabricoutController extends Controller
                     }
                 }
             }
-
-            return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
+print_r($request->submit );
+            // return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
         }
 
         //check next data then save and set end count to session  and show create with end count
