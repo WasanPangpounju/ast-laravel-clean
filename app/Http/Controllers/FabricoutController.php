@@ -352,7 +352,7 @@ class FabricoutController extends Controller
             $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
 
             $orders = AstPurchaseorder::select('id', 'customerName', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder')
-                ->whereIn('purchaseOrder', $request->purchaseOrder )
+                ->whereIn('id', $ecp)
                 ->orderBy('customerName')
                 ->get();
             // var_dump($order_sendW);
@@ -401,7 +401,7 @@ class FabricoutController extends Controller
             }
 print_r($request->purchaseOrder . '\n');
 print(count($orders) );
-            // return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
+            return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
         }
 
         
