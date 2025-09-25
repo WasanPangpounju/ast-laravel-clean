@@ -258,38 +258,36 @@ class FabricoutController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+
 public function store(Request $request)
 {
-    // 1) ค้นหา (คง logic เดิม แต่เกลา $searchInput ให้สอดคล้อง)
+    /* ---------- 1) ค้นหา (คง logic เดิม+เกลา $searchInput) ---------- */
     if ($request->filled('submit') && $request->submit == 'searchImport') {
         $select_search = 'findNo';
         $searchInput   = $request->findNo ?? $request->Notype ?? '';
 
         if (empty($request->findNo) && $request->filled('Notype')) {
-            $importFabricout = Fabricout::where('vatType', 'LIKE', '%' . $request->Notype . '%')
+            $importFabricout = Fabricout::where('vatType','LIKE','%'.$request->Notype.'%')
                 ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
                 ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
-                ->orderBy('lastDate', 'DESC')
-                ->get();
+                ->orderBy('lastDate','DESC')->get();
         } elseif ($request->filled('findNo') && $request->Notype === 'non') {
-            $importFabricout = Fabricout::where('vatNo', 'LIKE', '%' . $request->findNo . '%')
+            $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
                 ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
                 ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
-                ->orderBy('lastDate', 'DESC')
-                ->get();
+                ->orderBy('lastDate','DESC')->get();
         } else {
-            $importFabricout = Fabricout::where('vatNo', 'LIKE', '%' . $request->findNo . '%')
-                ->where('vatType', 'LIKE', '%' . $request->Notype . '%')
+            $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
+                ->where('vatType','LIKE','%'.$request->Notype.'%')
                 ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
                 ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
-                ->orderBy('lastDate', 'DESC')
-                ->get();
+                ->orderBy('lastDate','DESC')->get();
         }
 
-        return view('fabricout.index', compact('importFabricout', 'select_search', 'searchInput'));
+        return view('fabricout.index', compact('importFabricout','select_search','searchInput'));
     }
 
-    // 2) generateByOrder (คง logic เดิม)
+    /* ---------- 2) generateByOrder: set context + session ให้ครบ (รวม customerName) ---------- */
     if ($request->filled('submit') && $request->submit == 'generateByOrder') {
         $customers = Customer::orderBy('name')->get();
 
@@ -300,23 +298,20 @@ public function store(Request $request)
         $order_id = $request->input('orderId');
         session()->put('orderId', $order_id);
 
-        $order_send = AstPurchaseorder::select('customerName','fabricId','fabricStructure','fabricPattern')
-            ->where('id', $order_id)->get();
+        $order_send  = AstPurchaseorder::select('customerName','fabricId','fabricStructure','fabricPattern')
+                        ->where('id', $order_id)->get();
         $order_sendW = FabricAst::select('fabric_w')->where('purchaseOrder', $order_id)->get();
 
-        $ecp = FabricAststructure::select('purchaseOrder AS id')
-            ->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
+        // เก็บชื่อลูกค้าลง session เพื่อให้หน้า create โชว์ได้
+        session()->put('customerName', $order_send[0]->customerName ?? '');
 
-        $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
-            ->whereIn('id', $ecp)->orderBy('customerName')->get();
-
-        // set session ฟิลด์โครงสร้างจาก order
+        // ใส่โครงสร้าง/ลาย/หน้ากว้าง ลง session
         session()->forget(['fabricStruct','fabricPattern','fabricW']);
         session()->put('fabricStruct',  $order_send[0]->fabricStructure ?? '');
         session()->put('fabricPattern', $order_send[0]->fabricPattern ?? '');
         session()->put('fabricW',       $order_sendW[0]->fabric_w ?? '');
 
-        // คำนวณเลขบิลล่าสุดต่อประเภท
+        // เลขบิลล่าสุดของแต่ละประเภท
         $lastVat = Fabricout::groupBy('vatType')
             ->select('vatType', Fabricout::raw('MAX(vatNo) as max_no'))->get();
         $vatA = '1001'; $vatB = '1001'; $vatC = '1001';
@@ -326,22 +321,26 @@ public function store(Request $request)
             if ($v->vatType === 'C') $vatC = $v->max_no ? $v->max_no + 1 : '1001';
         }
 
-        $order_id = $order_id;
-        $customer_name = '';
-        $fabric_struct = '';
+        $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2','อนุมัติให้ผลิต')->get();
+        $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
+                    ->whereIn('id',$ecp)->orderBy('customerName')->get();
 
+        $customer_name = session('customerName','');
+        $fabric_struct = '';
         $stockFabricStruct = stockfabric::groupBy(['fabricStruct','fabricPattern','fabricW'])
             ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
             ->get();
 
-        return view('fabricout.create', compact('customers','order_id','customer_name','fabric_struct','orders','stockFabricStruct','vatA','vatB','vatC'));
+        return view('fabricout.create', compact(
+            'customers','order_id','customer_name','fabric_struct',
+            'orders','stockFabricStruct','vatA','vatB','vatC'
+        ));
     }
 
-    // ฟังก์ชันช่วยเตรียมค่า (ใช้ซ้ำทั้ง nextData / endData)
+    /* ---------- 3) เตรียมค่าใช้ร่วม (fallback: request -> session) ---------- */
     $fixedDate = str_replace('/', '-', $request->input('dt') ?: date('Y-m-d'));
     $date      = date('Y-m-d', strtotime($fixedDate));
 
-    // รับจาก request ถ้าไม่มีให้ fallback ไป session (สำคัญมากกรณีรอบสรุป)
     $vatNo     = $request->input('vatNo')     ?? session('vatNo');
     $vatType   = $request->input('vatType')   ?? session('vatType');
 
@@ -351,146 +350,108 @@ public function store(Request $request)
     $receiveType  = $request->input('receiveType')  ?? session('receiveType');
     $orderId      = $request->input('orderId')      ?? session('orderId');
 
-    $fabricStruct  = $request->input('fabricStruct')  ?? session('fabricStruct');
-    $fabricPattern = $request->input('fabricPattern') ?? session('fabricPattern');
-    $fabricW       = $request->input('fabricW')       ?? session('fabricW');
-
+    $fabricStruct   = $request->input('fabricStruct')   ?? session('fabricStruct');
+    $fabricPattern  = $request->input('fabricPattern')  ?? session('fabricPattern');
+    $fabricW        = $request->input('fabricW')        ?? session('fabricW');
     $customerReplace     = $request->input('customerReplace')     ?? session('customerReplace');
     $fabricStructReplace = $request->input('fabricStructReplace') ?? session('fabricStructReplace');
 
-    // เตรียม arr_data จาก sumYard (เอาเฉพาะที่มีค่า)
+    // เตรียมก้อนที่ผู้ใช้กรอกในรอบนี้ (เอาเฉพาะมีค่า)
     $arr_data = [];
     foreach ($request->input('sumYard', []) as $v) {
         if ($v !== '' && $v !== null) $arr_data[] = $v;
     }
 
-    // 3) กด "บันทึกรายการถัดไป"
-    if ($request->filled('submit') && $request->submit == 'nextData') {
+    // ฟังก์ชันช่วย (คำนวณ fold เริ่ม, ทำให้ refId คงอยู่, และบันทึก)
+    $saveChunk = function(array $arr) use (
+        $date,$fabricStruct,$fabricPattern,$fabricW,$customerReplace,$fabricStructReplace,
+        $vatNo,$vatType,$customerName,$receiveName,$comment,$receiveType,$orderId
+    ) {
+        if (empty($arr)) return;
+
         $oldEnd    = session('endCount') ?? 0;
         $startFold = ($oldEnd > 0) ? ($oldEnd + 1) : 1;
 
-        // อัปเดตรวม (sum) ใน session (ตามโค้ดเดิมของคุณ)
-        if (count($arr_data) > 0) {
+        // คง/สร้าง refId
+        if (session()->has('refId')) {
+            $refId = session('refId');
+        } else {
+            $bytes  = random_bytes(32);
+            $base64 = base64_encode($bytes);
+            $refId  = str_replace('/', '', $base64);
+            session()->put('refId', $refId);
+        }
+
+        DB::transaction(function() use (
+            $arr,$refId,$date,$fabricStruct,$fabricPattern,$fabricW,$customerReplace,$fabricStructReplace,
+            $vatNo,$vatType,$startFold,$customerName,$receiveName,$comment,$receiveType,$orderId
+        ) {
+            $this->saveFabricData(
+                $arr,
+                $refId,
+                auth()->user()->name,
+                $fabricStruct,
+                $fabricPattern,
+                $fabricW,
+                $customerReplace,
+                $fabricStructReplace,
+                $vatNo,
+                $vatType,
+                $startFold,
+                $date,
+                session('no'),
+                $customerName,
+                $receiveName,
+                $comment,
+                $receiveType,
+                $orderId
+            );
+        });
+
+        // อัปเดต endCount ต่อท้าย
+        $newEnd = $oldEnd + count($arr);
+        session()->put('endCount', $newEnd);
+    };
+
+    /* ---------- 4) nextData: บันทึกก้อนนี้ แล้วกลับไป create กรอกต่อ ---------- */
+    if ($request->filled('submit') && $request->submit == 'nextData') {
+        // อัปเดตรวม sum ใน session
+        if (!empty($arr_data)) {
             $pageSum = array_sum(array_map('floatval', $arr_data));
             $total   = (float)(session('sum') ?? 0) + $pageSum;
             session()->put('sum', $total);
         }
 
-        // คง/สร้าง refId
-        if (session()->has('refId')) {
-            $refId = session('refId');
-        } else {
-            $bytes  = random_bytes(32);
-            $base64 = base64_encode($bytes);
-            $refId  = str_replace('/', '', $base64);
-            session()->put('refId', $refId);
-        }
+        // บันทึกก้อนนี้ (และต่อ fold ให้ถูก)
+        $saveChunk($arr_data);
 
-        // บันทึกชุดนี้ (ถ้ามีค่า)
-        if (count($arr_data) > 0) {
-            \DB::transaction(function() use (
-                $arr_data,$refId,$fabricStruct,$fabricPattern,$fabricW,
-                $customerReplace,$fabricStructReplace,$vatNo,$vatType,
-                $startFold,$date,$customerName,$receiveName,$comment,$receiveType,$orderId
-            ) {
-                $this->saveFabricData(
-                    $arr_data,
-                    $refId,
-                    auth()->user()->name,
-                    $fabricStruct,
-                    $fabricPattern,
-                    $fabricW,
-                    $customerReplace,
-                    $fabricStructReplace,
-                    $vatNo,
-                    $vatType,
-                    $startFold,
-                    $date,
-                    session('no'),      // no ถูกตั้งไว้ใน create()
-                    $customerName,
-                    $receiveName,
-                    $comment,
-                    $receiveType,
-                    $orderId
-                );
-            });
-        }
-
-        // อัปเดต endCount ต่อท้าย
-        $newEnd = $oldEnd + count($arr_data);
-        session()->put('endCount', $newEnd);
-
-        // เก็บค่าคอนเท็กซ์ลง session สำหรับรอบถัดไป
+        // เก็บ context กลับ session (เพื่อให้หน้า create รอบต่อไปโชว์ครบ)
         session()->put([
-            'dt'               => $date,
-            'customerName'     => $customerName,
-            'receiveName'      => $receiveName,
-            'comment'          => $comment,
-            'receiveType'      => $receiveType,
-            'orderId'          => $orderId,
-            'fabricStruct'     => $fabricStruct,
-            'fabricPattern'    => $fabricPattern,
-            'fabricW'          => $fabricW,
-            'customerReplace'  => $customerReplace,
-            'fabricStructReplace' => $fabricStructReplace,
-            'vatNo'            => $vatNo,
-            'vatType'          => $vatType,
+            'dt'                   => $date,
+            'customerName'         => $customerName,
+            'receiveName'          => $receiveName,
+            'comment'              => $comment,
+            'receiveType'          => $receiveType,
+            'orderId'              => $orderId,
+            'fabricStruct'         => $fabricStruct,
+            'fabricPattern'        => $fabricPattern,
+            'fabricW'              => $fabricW,
+            'customerReplace'      => $customerReplace,
+            'fabricStructReplace'  => $fabricStructReplace,
+            'vatNo'                => $vatNo,
+            'vatType'              => $vatType,
         ]);
 
-        // กลับไปหน้า create เพื่อกรอกต่อ
+        // กลับไปหน้า create เพื่อกรอกเพิ่ม
         return $this->create();
     }
 
-    // 4) กด "บันทึกเสร็จสิ้น"
+    /* ---------- 5) endData: บันทึกก้อนสุดท้าย แล้วล้าง context ---------- */
     if ($request->filled('submit') && $request->submit == 'endData') {
-        $oldEnd    = session('endCount') ?? 0;
-        $startFold = ($oldEnd > 0) ? ($oldEnd + 1) : 1;
+        // บันทึกก้อนสุดท้าย (ถ้ามี)
+        $saveChunk($arr_data);
 
-        // คง/สร้าง refId
-        if (session()->has('refId')) {
-            $refId = session('refId');
-        } else {
-            $bytes  = random_bytes(32);
-            $base64 = base64_encode($bytes);
-            $refId  = str_replace('/', '', $base64);
-            session()->put('refId', $refId);
-        }
-
-        // บันทึกก้อนสุดท้าย (ถ้ามีค่า)
-        if (count($arr_data) > 0) {
-            \DB::transaction(function() use (
-                $arr_data,$refId,$fabricStruct,$fabricPattern,$fabricW,
-                $customerReplace,$fabricStructReplace,$vatNo,$vatType,
-                $startFold,$date,$customerName,$receiveName,$comment,$receiveType,$orderId
-            ) {
-                $this->saveFabricData(
-                    $arr_data,
-                    $refId,
-                    auth()->user()->name,
-                    $fabricStruct,
-                    $fabricPattern,
-                    $fabricW,
-                    $customerReplace,
-                    $fabricStructReplace,
-                    $vatNo,
-                    $vatType,
-                    $startFold,
-                    $date,
-                    session('no'),
-                    $customerName,
-                    $receiveName,
-                    $comment,
-                    $receiveType,
-                    $orderId
-                );
-            });
-        }
-
-        // อัปเดต endCount เฉพาะก่อนล้าง (เผื่อใช้ที่อื่น)
-        $newEnd = $oldEnd + count($arr_data);
-        session()->put('endCount', $newEnd);
-
-        // ล้างคอนเท็กซ์ทั้งหมด หลังบันทึกเสร็จสิ้น
+        // ล้าง context หลังบันทึกเสร็จสิ้น
         session()->forget([
             'refId','endCount','dt','fabricStruct','fabricPattern','fabricW',
             'customerReplace','fabricStructReplace','no','orderId','sum',
@@ -500,17 +461,16 @@ public function store(Request $request)
         return redirect('/fabricout');
     }
 
-    // 5) (ถ้ามี) submitfabricout - คงโค้ดเดิมของคุณไว้ได้เลย
+    /* ---------- 6) (ถ้ามี) submitfabricout: ใช้โค้ดเดิมของคุณ ---------- */
     if ($request->filled('submit') && $request->submit == 'submitfabricout') {
-        // --- วางโค้ดเดิมสร้าง PDF ของคุณไว้ตรงนี้โดยไม่ต้องแก้ ---
-        // return ... (ตามเดิม)
+        // วางโค้ดสร้าง PDF เดิมของคุณไว้ตามเดิม
+        // ...
     }
 
-    // fallback
-    return redirect()->back()->with('error', 'คำสั่งไม่ถูกต้อง');
+    /* ---------- fallback ---------- */
+    return back()->with('error', 'คำสั่งไม่ถูกต้อง');
 }
-
-
+    
     //โค้ดเก่า
     public function storeback(Request $request)
     {
