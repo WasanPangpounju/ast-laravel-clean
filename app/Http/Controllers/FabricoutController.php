@@ -401,8 +401,8 @@ class FabricoutController extends Controller
                     }
                 }
             }
-print_r($request->purchaseOrder . ' ');
-print(count($orders) );
+// print_r($request->purchaseOrder . ' ');
+// print(count($orders) );
             return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
         }
 
