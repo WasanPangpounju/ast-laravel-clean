@@ -242,7 +242,14 @@
                                 } else {
                                     $fabricW = '';
                                 }
-                                
+
+                                                                //check เลข SO จาก session
+                                if (session()->has('purchaseOrder')) {
+                                    $purchaseOrder = session()->get('purchaseOrder');
+                                } else {
+                                    $purchaseOrder = '';
+                                }
+
                                 //check comment from session
                                 if (session()->has('comment')) {
                                     $comment = session()->get('comment');
@@ -404,7 +411,7 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                                                     placeholder="หน้ากว้าง" value="{{ $backdata->fabricW }}" required>
                                             @else
                                                 <input type="text" name="fabricW" class="form-control"
-                                                    id="fabricW"placeholder="หน้ากว้าง" value="{{ $fabricW }}"
+                                                    id="fabricW"placeholder="หน้ากว้าง" value="{{ $purchaseOrder }}"
                                                     required>
                                             @endif
                                         </div>

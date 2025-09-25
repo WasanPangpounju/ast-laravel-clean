@@ -359,10 +359,12 @@ class FabricoutController extends Controller
             session()->forget('fabricStruct');
             session()->forget('fabricPattern');
             session()->forget('fabricW');
+            session()->forget('purchaseOrder');
 
             session()->put('fabricStruct',  $order_send[0]->fabricStructure);
             session()->put('fabricPattern', $order_send[0]->fabricPattern);
             session()->put('fabricW', $order_sendW[0]->fabric_w);
+            session()->put('purchaseOrder', $request->purchaseOrder);
 
             $stockFabricStruct = stockfabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW',])
                 ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as 
@@ -399,7 +401,7 @@ class FabricoutController extends Controller
                     }
                 }
             }
-print_r($request->purchaseOrder . '\n');
+print_r($request->purchaseOrder . ' ');
 print(count($orders) );
             return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
         }
