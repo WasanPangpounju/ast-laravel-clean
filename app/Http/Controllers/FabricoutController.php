@@ -409,7 +409,8 @@ class FabricoutController extends Controller
         
         // Find No
         //generate by order
-        elseif ($request->filled('submit') && $request->submit == 'generateByOrder') {
+        else {
+            if ($request->filled('submit') && $request->submit == 'generateByOrder') {
             $customers = Customer::orderBy('name')->get();
             // session()->put('no', 1001);
             $lastRecord = Fabricout::latest()->first(); // get the last record of the table
@@ -487,6 +488,8 @@ class FabricoutController extends Controller
             return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
         }
 
+    }
+    
         //check next data then save and set end count to session  and show create with end count
         if ($request->filled('submit') && $request->submit == 'nextData') {
             $oldEnd = session()->get('endCount');
