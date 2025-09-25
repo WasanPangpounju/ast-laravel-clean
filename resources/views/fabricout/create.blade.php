@@ -431,7 +431,7 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
 
                             </div> --}}
                                 <div class="form-group">
-                                    <label for="customerName">ผู้สั่ง</label>
+                                    <label for="customerName">ผู้สั่ง{{ $purchaseOrder }}</label>
 
                                     @if (isset($backdata))
                                         <input type="text" name="customerName" class="form-control" id="customerName"
