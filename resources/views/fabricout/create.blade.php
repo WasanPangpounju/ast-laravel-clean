@@ -317,7 +317,6 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                             ?>
                                 <input type="hidden" name="dt" class="form-control" value="<?php print $dt; ?>">
                                 <input type="hidden" name="fabricStruct" class="form-control" value="<?php print $fabricStruct; ?>">
-                                <input type="hidden" name="purchaseOrder" class="form-control" value="<?php print $purchaseOrder; ?>">
                                 <input type="hidden" name="fabricPattern" class="form-control" value="<?php print $fabricPattern; ?>">
                                 <input type="hidden" name="fabricW" class="form-control" value="<?php print $fabricW; ?>">
 
@@ -341,7 +340,6 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                                 <?php print("</div>"); }else{ ?>
 
                                 <input type="hidden" name="orderId" class="form-control" value="<?php print $order_id; ?>">
-                                                                <input type="hidden" name="purchaseOrder" class="form-control" value="<?php print $purchaseOrder; ?>">
 
                                 <div class="form-group">
                                       <label for="vatNo1" class="d-block mt-2">เลขที่บิล</label>
