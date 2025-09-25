@@ -157,7 +157,8 @@ class InventoryController extends Controller
     {
         //
         //searchImport
-var_dump($request)
+// var_dump($request)
+
         if ($request->filled('submit') && $request->submit == 'searchImport') {
 
     // --- normalize fabricStruct: * == x, ลบช่องว่าง, to lower ---
