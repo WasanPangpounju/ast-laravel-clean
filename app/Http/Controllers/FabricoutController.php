@@ -325,90 +325,91 @@ class FabricoutController extends Controller
         }
 
         //ดึงข้อมูล Order จากเลข SO 
-//         if ($request->filled('submit') && $request->filled('purchaseOrder')) {
-//             $customers = Customer::orderBy('name')->get();
-//             // session()->put('no', 1001);
-//             $lastRecord = Fabricout::latest()->first(); // get the last record of the table
-//             $no = $lastRecord->no; // get the value of the "no" field from the last record
-//             $no = $no + 1;
+        if ($request->filled('submit') && $request->filled('purchaseOrder')) {
+            $customers = Customer::orderBy('name')->get();
+            // session()->put('no', 1001);
+            $lastRecord = Fabricout::latest()->first(); // get the last record of the table
+            $no = $lastRecord->no; // get the value of the "no" field from the last record
+            $no = $no + 1;
 
-//             if (!session()->has('no')) {
-//                 session()->put('no', $no);
-//             }
+            if (!session()->has('no')) {
+                session()->put('no', $no);
+            }
 
-//             $order_id = $request->input('orderId');
-//             session()->put('orderId', $order_id);
+            $order_id = $request->input('orderId');
+            session()->put('orderId', $order_id);
 
-//             $customer_name = $request->input('customerName');
-//             $fabric_struct = $request->input('fabricStruct');
-//             $order_send = AstPurchaseorder::select('customerName', 'fabricId', 'fabricStructure', 'fabricPattern')
-//                 ->where('id', $order_id)
-//                 ->get();
+            $customer_name = $request->input('customerName');
+            $fabric_struct = $request->input('fabricStruct');
+            $order_send = AstPurchaseorder::select('customerName', 'fabricId', 'fabricStructure', 'fabricPattern')
+                ->where('id', $order_id)
+                ->get();
 
-//             $order_sendW = FabricAst::select('fabric_w')
-//                 ->where('purchaseOrder', $order_id)
-//                 ->get();
+            $order_sendW = FabricAst::select('fabric_w')
+                ->where('purchaseOrder', $order_id)
+                ->get();
 
-//             $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
+            $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
 
-//             $orders = AstPurchaseorder::select('id', 'customerName', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder')
-//                 ->whereIn('id', $ecp)
-//                 ->orderBy('customerName')
-//                 ->get();
-//             // var_dump($order_sendW);
-//             session()->forget('fabricStruct');
-//             session()->forget('fabricPattern');
-//             session()->forget('fabricW');
-//             session()->forget('purchaseOrder');
+            $orders = AstPurchaseorder::select('id', 'customerName', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder')
+                ->whereIn('id', $ecp)
+                ->orderBy('customerName')
+                ->get();
+            // var_dump($order_sendW);
+            session()->forget('fabricStruct');
+            session()->forget('fabricPattern');
+            session()->forget('fabricW');
+            session()->forget('purchaseOrder');
 
-//             session()->put('fabricStruct',  $order_send[0]->fabricStructure);
-//             session()->put('fabricPattern', $order_send[0]->fabricPattern);
-//             session()->put('fabricW', $order_sendW[0]->fabric_w);
-//             session()->put('purchaseOrder', $request->purchaseOrder);
+            session()->put('fabricStruct',  $order_send[0]->fabricStructure);
+            session()->put('fabricPattern', $order_send[0]->fabricPattern);
+            session()->put('fabricW', $order_sendW[0]->fabric_w);
+            session()->put('purchaseOrder', $request->purchaseOrder);
 
-//             $stockFabricStruct = stockfabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW',])
-//                 ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as 
-//                 lastDate')
-//                 ->get();
+            $stockFabricStruct = stockfabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW',])
+                ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as 
+                lastDate')
+                ->get();
 
 
-//             //define vatNo
-//             $lastVat = Fabricout::groupBy('vatType')
-//                 ->select('vatType', Fabricout::raw('MAX(vatNo) as max_no'))
-//                 ->get();
-//             $vatA = '1001';
-//             $vatB = '1001';
-//             $vatC = '1001';
-//             foreach ($lastVat as $test) {
-//                 // print($test->max_no );
-//                 if ($test->vatType  == 'A') {
-//                     if ($test->max_no == '') {
-//                         $vatA = '1001';
-//                     } else {
-//                         $vatA = $test->max_no + 1;
-//                     }
-//                 } elseif ($test->vatType  == 'B') {
-//                     if ($test->max_no == '') {
-//                         $vatB = '1001';
-//                     } else {
-//                         $vatB = $test->max_no + 1;
-//                     }
-//                 } elseif ($test->vatType  == 'C') {
-//                     if ($test->max_no == '') {
-//                         $vatC = '1001';
-//                     } else {
-//                         $vatC = $test->max_no + 1;
-//                     }
-//                 }
-//             }
-// // print_r($request->purchaseOrder . ' ');
-// // print(count($orders) );
-//             return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
-//         }
+            //define vatNo
+            $lastVat = Fabricout::groupBy('vatType')
+                ->select('vatType', Fabricout::raw('MAX(vatNo) as max_no'))
+                ->get();
+            $vatA = '1001';
+            $vatB = '1001';
+            $vatC = '1001';
+            foreach ($lastVat as $test) {
+                // print($test->max_no );
+                if ($test->vatType  == 'A') {
+                    if ($test->max_no == '') {
+                        $vatA = '1001';
+                    } else {
+                        $vatA = $test->max_no + 1;
+                    }
+                } elseif ($test->vatType  == 'B') {
+                    if ($test->max_no == '') {
+                        $vatB = '1001';
+                    } else {
+                        $vatB = $test->max_no + 1;
+                    }
+                } elseif ($test->vatType  == 'C') {
+                    if ($test->max_no == '') {
+                        $vatC = '1001';
+                    } else {
+                        $vatC = $test->max_no + 1;
+                    }
+                }
+            }
+// print_r($request->purchaseOrder . ' ');
+// print(count($orders) );
+            return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
+        }
 
         
         // Find No
         //generate by order
+        else {
             if ($request->filled('submit') && $request->submit == 'generateByOrder') {
             $customers = Customer::orderBy('name')->get();
             // session()->put('no', 1001);
@@ -487,6 +488,7 @@ class FabricoutController extends Controller
             return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
         }
 
+    }
     
         //check next data then save and set end count to session  and show create with end count
         if ($request->filled('submit') && $request->submit == 'nextData') {
