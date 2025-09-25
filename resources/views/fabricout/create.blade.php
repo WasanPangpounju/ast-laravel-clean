@@ -63,9 +63,7 @@
                 }
                 ?>
                 <h2 class="title"><i class="fa fa-caret-right"></i> บันทึกเปิดบิลผ้าเลขที่ <stong id="vatno">
-                        {{ $vatNox }}</strong> 
-                    <stong id="p">
-                        {{ $purchaseOrder}}</strong> </h2>
+                        {{ $vatNox }}</strong> </h2>
                 <button type="button" class="btn b_order" name="submit" value="index"><a
                         href="{{ route('inventory.index') }}">จัดส่งตามใบสั่งซื้อ</a></button><br><br>
                 <form method="post" action="{{ route('fabricout.store') }}" id="myForm">
