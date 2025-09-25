@@ -406,7 +406,7 @@ print_r($request->purchaseOrder);
         
         // Find No
         //generate by order
-        if ($request->filled('submit') && $request->submit == 'generateByOrder') {
+        elseif ($request->filled('submit') && $request->submit == 'generateByOrder') {
             $customers = Customer::orderBy('name')->get();
             // session()->put('no', 1001);
             $lastRecord = Fabricout::latest()->first(); // get the last record of the table
