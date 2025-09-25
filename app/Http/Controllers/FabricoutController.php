@@ -352,7 +352,7 @@ class FabricoutController extends Controller
             $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
 
             $orders = AstPurchaseorder::select('id', 'customerName', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder')
-                ->whereIn('id', $ecp)
+                ->whereIn('id', $request->purchaseOrder )
                 ->orderBy('customerName')
                 ->get();
             // var_dump($order_sendW);
