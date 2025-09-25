@@ -157,7 +157,7 @@ class InventoryController extends Controller
     {
         //
         //searchImport
-
+print_r($request)
         if ($request->filled('submit') && $request->submit == 'searchImport') {
 
     // --- normalize fabricStruct: * == x, ลบช่องว่าง, to lower ---
