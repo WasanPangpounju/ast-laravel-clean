@@ -325,9 +325,7 @@ class FabricoutController extends Controller
         }
 
         //ดึงข้อมูล Order จากเลข SO 
-// Find No
-        //generate by order
-        if ($request->filled('submit') && $request->submit == 'generateByOrder') {
+        if ($request->filled('submit') && $request->filled('purchaseOrder')) {
             $customers = Customer::orderBy('name')->get();
             // session()->put('no', 1001);
             $lastRecord = Fabricout::latest()->first(); // get the last record of the table
