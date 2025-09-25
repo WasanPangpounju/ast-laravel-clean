@@ -157,7 +157,7 @@ class InventoryController extends Controller
     {
         //
         //searchImport
-// var_dump($request)
+print_r($request->input);
 
         if ($request->filled('submit') && $request->submit == 'searchImport') {
 
