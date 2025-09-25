@@ -62,7 +62,7 @@
                     $vatNox = $vatNox . 'A-' . $vatA;
                 }
                 ?>
-                <h2 class="title"><i class="fa fa-caret-right"></i> บันทึกเปิดบิลผ้าเลขที่ <stong id="vatno">
+                <h2 class="title"><i class="fa fa-caret-right"></i> บันทึกเปิดบิลผ้าเลขที่ <strong id="vatno">
                         {{ $vatNox }}</strong> </h2>
                 <button type="button" class="btn b_order" name="submit" value="index"><a
                         href="{{ route('inventory.index') }}">จัดส่งตามใบสั่งซื้อ</a></button><br><br>
@@ -315,6 +315,9 @@ print('  <b>ผู้รับ : </b>'. $receiveName. ' '.'<br>');
 
 print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                             ?>
+                            {{-- เพิ่มให้มีค่าเลขบิล/ประเภทบิลทุกครั้ง --}}
+<input type="hidden" name="vatNo"   id="vatNo1"   value="{{ $realVatNo }}">
+<input type="hidden" name="vatType" id="vatType1" value="{{ $realVatType }}">
                                 <input type="hidden" name="dt" class="form-control" value="<?php print $dt; ?>">
                                 <input type="hidden" name="fabricStruct" class="form-control" value="<?php print $fabricStruct; ?>">
                                 <input type="hidden" name="fabricPattern" class="form-control" value="<?php print $fabricPattern; ?>">
