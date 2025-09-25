@@ -338,7 +338,7 @@ class FabricoutController extends Controller
 
             $order_id = $request->input('orderId');
             session()->put('orderId', $order_id);
-print_r($order_id);
+
             $customer_name = $request->input('customerName');
             $fabric_struct = $request->input('fabricStruct');
             $order_send = AstPurchaseorder::select('customerName', 'fabricId', 'fabricStructure', 'fabricPattern')
@@ -399,7 +399,8 @@ print_r($order_id);
                     }
                 }
             }
-print_r($request->purchaseOrder);
+print_r($request->purchaseOrder . '\n');
+print_r($orders);
             // return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
         }
 
