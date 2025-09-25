@@ -63,7 +63,9 @@
                 }
                 ?>
                 <h2 class="title"><i class="fa fa-caret-right"></i> บันทึกเปิดบิลผ้าเลขที่ <stong id="vatno">
-                        {{ $vatNox }}</strong> </h2>
+                        {{ $vatNox }}</strong> 
+                    <stong id="p">
+                        {{ $purchaseOrder}}</strong> </h2>
                 <button type="button" class="btn b_order" name="submit" value="index"><a
                         href="{{ route('inventory.index') }}">จัดส่งตามใบสั่งซื้อ</a></button><br><br>
                 <form method="post" action="{{ route('fabricout.store') }}" id="myForm">
@@ -411,7 +413,7 @@ print(' <b>หมายเหตุ : </b>'. $comment .'<br>');
                                                     placeholder="หน้ากว้าง" value="{{ $backdata->fabricW }}" required>
                                             @else
                                                 <input type="text" name="fabricW" class="form-control"
-                                                    id="fabricW"placeholder="หน้ากว้าง" value="{{ $purchaseOrder }}"
+                                                    id="fabricW"placeholder="หน้ากว้าง" value="{{ $fabricW }}"
                                                     required>
                                             @endif
                                         </div>
