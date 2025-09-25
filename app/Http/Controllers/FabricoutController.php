@@ -504,7 +504,6 @@ class FabricoutController extends Controller
             session()->forget('fabricStruct');
             session()->forget('fabricPattern');
             session()->forget('fabricW');
-            session()->forget('purchaseOrder');
 
             session()->forget('customerReplace');
             session()->forget('fabricStructReplace');
@@ -569,7 +568,6 @@ class FabricoutController extends Controller
             session()->put('fabricStruct',  $request->input('fabricStruct'));
             session()->put('fabricPattern',  $request->input('fabricPattern'));
             session()->put('fabricW',  $request->input('fabricW'));
-            session()->put('purchaseOrder',  $request->input('purchaseOrder'));
 
             session()->put('customerReplace',  $request->input('customerReplace'));
             session()->put('fabricStructReplace',  $request->input('fabricStructReplace'));
