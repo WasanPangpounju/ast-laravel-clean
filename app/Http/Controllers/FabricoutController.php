@@ -399,7 +399,7 @@ class FabricoutController extends Controller
                     }
                 }
             }
-print_r($request->submit );
+print_r($request);
             // return view('fabricout.create', compact('customers', 'order_id', 'customer_name', 'fabric_struct', 'orders', 'stockFabricStruct', 'vatA', 'vatB', 'vatC'));
         }
 
