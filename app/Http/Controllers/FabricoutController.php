@@ -292,7 +292,7 @@ class FabricoutController extends Controller
         $customers  = Customer::orderBy('name')->get();
 
         $lastRecord = Fabricout::latest()->first();
-        $no = $lastRecord ? ($lastRecord->no + 1) : 1001;
+        $no         = $lastRecord ? ($lastRecord->no + 1) : 1001;
         if (!session()->has('no')) session()->put('no', $no);
 
         $order_id = $request->input('orderId');
@@ -302,14 +302,20 @@ class FabricoutController extends Controller
                         ->where('id', $order_id)->get();
         $order_sendW = FabricAst::select('fabric_w')->where('purchaseOrder', $order_id)->get();
 
-        session()->put('customerName', $order_send[0]->customerName ?? '');
+        // เก็บค่าพื้นฐานลง session เพื่อโชว์ในฟอร์ม
+        session()->put('customerName',  $order_send[0]->customerName  ?? '');
         session()->put('fabricStruct',  $order_send[0]->fabricStructure ?? '');
         session()->put('fabricPattern', $order_send[0]->fabricPattern ?? '');
-        session()->put('fabricW',       $order_sendW[0]->fabric_w ?? '');
+        session()->put('fabricW',       $order_sendW[0]->fabric_w     ?? '');
 
-        // เคลียร์ snapshot เดิม (ถ้ามี) เวลาเริ่มบิลใหม่
+        // ดึง purchaseOrder (SO) จากตารางใบสั่งซื้อ แล้วเก็บลง session
+        $po = AstPurchaseorder::where('id', $order_id)->value('purchaseOrder');
+        session()->put('purchaseOrder', $po ?? '');
+
+        // เริ่มใบใหม่ เคลียร์ snapshot เดิม
         session()->forget('fabricout_group');
 
+        // เตรียมเลขบิลต่อประเภท
         $lastVat = Fabricout::groupBy('vatType')
             ->select('vatType', Fabricout::raw('MAX(vatNo) as max_no'))->get();
         $vatA = '1001'; $vatB = '1001'; $vatC = '1001';
@@ -339,10 +345,10 @@ class FabricoutController extends Controller
     $fixedDate = str_replace('/', '-', $request->input('dt') ?: date('Y-m-d'));
     $date      = date('Y-m-d', strtotime($fixedDate));
 
-    // helper: เอาค่าจาก request ถ้า "มีและไม่ว่าง" ไม่งั้น fallback session
+    // helper: ถ้ามีค่าและไม่ว่างใน request ใช้ค่านั้น ไม่งั้น fallback session
     $val = fn(string $key) => $request->filled($key) ? trim((string)$request->input($key)) : session($key);
 
-    // สร้าง/คง snapshot ของคีย์ที่ใช้ group (เพื่อไม่ให้แตกเป็น 2 รายการ)
+    // สร้าง snapshot ของคีย์กรุ๊ปครั้งแรก แล้วคงไว้จนจบการบันทึก (กันแตกบิล)
     if (!session()->has('fabricout_group')) {
         $snapshot = [
             'vatNo'         => $val('vatNo'),
@@ -353,26 +359,29 @@ class FabricoutController extends Controller
             'customerName'  => $val('customerName'),
             'receiveName'   => $val('receiveName'),
             'no'            => session('no'),
+            'orderId'       => session('orderId'),
+            'purchaseOrder' => session('purchaseOrder') ?? $val('purchaseOrder'),
         ];
         session()->put('fabricout_group', $snapshot);
     }
-    $G = session('fabricout_group');  // ใช้ G ตลอดการบันทึก
+    $G = session('fabricout_group');
 
-    // ฟิลด์อื่น ๆ ที่ไม่กระทบ group
+    // ฟิลด์อื่น ๆ
     $comment             = $val('comment');
     $receiveType         = $val('receiveType');
-    $orderId             = $val('orderId');
+    $orderId             = $G['orderId']       ?? $val('orderId');
+    $purchaseOrder       = $G['purchaseOrder'] ?? $val('purchaseOrder');
     $customerReplace     = $val('customerReplace');
     $fabricStructReplace = $val('fabricStructReplace');
 
-    // ก้อน yard รอบนี้
+    // ข้อมูลพับรอบนี้
     $arr_data = [];
     foreach ($request->input('sumYard', []) as $v) {
         if ($v !== '' && $v !== null) $arr_data[] = $v;
     }
 
-    // บันทึก 1 ก้อน: ต่อ fold จาก endCount และคง refId เดิม
-    $saveChunk = function(array $arr) use ($G, $date, $comment, $receiveType, $orderId, $customerReplace, $fabricStructReplace) {
+    // ฟังก์ชันบันทึก 1 ก้อน: ต่อ fold จาก endCount และคง refId เดิม
+    $saveChunk = function(array $arr) use ($G, $date, $comment, $receiveType, $orderId, $purchaseOrder, $customerReplace, $fabricStructReplace) {
         if (empty($arr)) return;
 
         $oldEnd    = session('endCount') ?? 0;
@@ -382,13 +391,11 @@ class FabricoutController extends Controller
         if (session()->has('refId')) {
             $refId = session('refId');
         } else {
-            $bytes  = random_bytes(32);
-            $base64 = base64_encode($bytes);
-            $refId  = str_replace('/', '', $base64);
+            $refId = str_replace('/', '', base64_encode(random_bytes(32)));
             session()->put('refId', $refId);
         }
 
-        DB::transaction(function() use ($arr, $refId, $G, $date, $comment, $receiveType, $orderId, $customerReplace, $fabricStructReplace, $startFold) {
+        DB::transaction(function() use ($arr, $refId, $G, $date, $comment, $receiveType, $orderId, $purchaseOrder, $customerReplace, $fabricStructReplace, $startFold) {
             $this->saveFabricData(
                 $arr,
                 $refId,
@@ -407,7 +414,8 @@ class FabricoutController extends Controller
                 $G['receiveName'],
                 $comment,
                 $receiveType,
-                $orderId
+                $orderId,
+                $purchaseOrder
             );
         });
 
@@ -423,15 +431,14 @@ class FabricoutController extends Controller
 
         $saveChunk($arr_data);
 
-        // เก็บคอนเท็กซ์ที่ไม่ใช่ group key กลับ session (โชว์ในฟอร์มรอบถัดไป)
+        // เก็บ context ที่ไม่ใช่ group key ให้ฟอร์มรอบถัดไป
         session()->put([
             'dt'                  => $date,
             'comment'             => $comment,
             'receiveType'         => $receiveType,
-            'orderId'             => $orderId,
             'customerReplace'     => $customerReplace,
             'fabricStructReplace' => $fabricStructReplace,
-            // (group key ไม่ต้องอัปเดตที่นี่ เพราะล็อกอยู่ใน fabricout_group แล้ว)
+            // orderId/purchaseOrder อยู่ใน snapshot แล้ว
         ]);
 
         return $this->create();
@@ -445,7 +452,7 @@ class FabricoutController extends Controller
             'refId','endCount','dt','fabricStruct','fabricPattern','fabricW',
             'customerReplace','fabricStructReplace','no','orderId','sum',
             'customerName','receiveName','comment','receiveType','vatNo','vatType',
-            'fabricout_group' // ล้าง snapshot ด้วย
+            'purchaseOrder','fabricout_group'
         ]);
 
         return redirect('/fabricout');
@@ -453,10 +460,58 @@ class FabricoutController extends Controller
 
     /* ---------- 6) submitfabricout (ถ้ามี) ---------- */
     if ($request->filled('submit') && $request->submit === 'submitfabricout') {
-        // วางโค้ดสร้าง PDF เดิมของคุณไว้ได้ตามเดิม
+        // … คงโค้ดเดิมสำหรับพิมพ์ PDF …
     }
 
     return back()->with('error','คำสั่งไม่ถูกต้อง');
+}
+
+private function saveFabricData(
+    array $data,
+    string $refId,
+    string $emp,
+    ?string $fabricStruct,
+    ?string $fabricPattern,
+    ?string $fabricW,
+    ?string $customerReplace,
+    ?string $fabricStructReplace,
+    ?string $vatNo,
+    ?string $vatType,
+    int $start,
+    string $createDate,
+    $no,
+    ?string $customerName,
+    ?string $receiveName,
+    ?string $comment,
+    ?string $receiveType,
+    $orderId = null,
+    $purchaseOrder = null   // << เพิ่มตัวนี้
+) {
+    $c = $start;
+    foreach ($data as $datasave) {
+        Fabricout::create([
+            'refId'               => $refId,
+            'emp'                 => $emp,
+            'orderId'             => $orderId,
+            'purchaseOrder'       => $purchaseOrder, // << บันทึก SO ทุกแถว
+            'no'                  => $no,
+            'customerName'        => $customerName,
+            'receiveName'         => $receiveName,
+            'receiveType'         => $receiveType,
+            'comment'             => $comment,
+            'fabricStruct'        => $fabricStruct,
+            'fabricPattern'       => $fabricPattern,
+            'fabricW'             => $fabricW,
+            'customerReplace'     => $customerReplace,
+            'fabricStructReplace' => $fabricStructReplace,
+            'vatNo'               => $vatNo,
+            'vatType'             => $vatType,
+            'fold'                => $c,
+            'sumYard'             => $datasave,
+            'createDate'          => $createDate,
+        ]);
+        $c++;
+    }
 }
 
     //โค้ดเก่า

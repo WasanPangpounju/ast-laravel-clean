@@ -28,6 +28,7 @@ class fabricout extends Model
             'comment',
             'receiveType',
             'orderId',
+            'purchaseOrder',
     ];
 
 }
