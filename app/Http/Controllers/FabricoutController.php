@@ -1488,7 +1488,7 @@ $this->fpdf->Cell(
         return $this->index();
     }
 
-    private function saveFabricData($data, $refId, $emp, $fabricStruct, $fabricPattern, $fabricW, $customerReplace, $fabricStructReplace, $vatNo, $vatType, $start, $createDate, $no, $customerName, $receiveName, $comment, $receiveType, $orderId)
+    private function saveFabricData_back($data, $refId, $emp, $fabricStruct, $fabricPattern, $fabricW, $customerReplace, $fabricStructReplace, $vatNo, $vatType, $start, $createDate, $no, $customerName, $receiveName, $comment, $receiveType, $orderId)
     {
         // echo   $refId .' '. $emp.' '. $fabricStruct .' '. $fabricW .' '. $start .' '. $createDate;
         // echo $orderId;
