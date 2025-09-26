@@ -36,7 +36,103 @@ class InventoryController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+
     public function index()
+{
+    // ออเดอร์ที่อนุมัติให้ผลิต
+    $ids = AstPurchaseorder::where('status', 'อนุมัติให้ผลิต')->pluck('id');
+
+    // ---------- รวมยอดจาก fabricouts แบบใหม่: อ้างอิงตามเลข SO ----------
+    // fabricouts.purchaseOrder = เลข SO (ไม่ใช่ id)
+    $foBySO = fabricout::select(
+            'purchaseOrder',
+            DB::raw('COUNT(fold) AS delivered_folds_so'),
+            DB::raw('SUM(sumYard) AS delivered_yards_so')
+        )
+        ->whereNotNull('purchaseOrder')
+        ->groupBy('purchaseOrder');
+
+    // ---------- รวมยอดจาก fabricouts แบบเก่า: อ้างอิงตาม id ----------
+    // ใช้เฉพาะแถวที่ purchaseOrder ยังเป็น NULL
+    $foById = fabricout::select(
+            'orderId',
+            DB::raw('COUNT(fold) AS delivered_folds_id'),
+            DB::raw('SUM(sumYard) AS delivered_yards_id')
+        )
+        ->whereNull('purchaseOrder')
+        ->whereNotNull('orderId')
+        ->groupBy('orderId');
+
+    // ---------- ความกว้างหน้าผ้า ต่อใบสั่งซื้อ ----------
+    // FabricAst.purchaseOrder อ้างถึง ast_purchaseorders.id (FK)
+    $faAgg = FabricAst::select(
+            'purchaseOrder',
+            DB::raw('MAX(fabric_w) AS fabric_w')
+        )
+        ->groupBy('purchaseOrder');
+
+    // ---------- ดึงออเดอร์ + ผูกยอดส่งแล้วทั้ง 2 แบบ + fabric_w ----------
+    $orders = AstPurchaseorder::select(
+            'ast_purchaseorders.id',
+            'ast_purchaseorders.purchaseOrder',
+            'ast_purchaseorders.customerName',
+            'ast_purchaseorders.createDate',
+            'ast_purchaseorders.fabricId',
+            'ast_purchaseorders.fabricStructure',
+            'ast_purchaseorders.orderSumYard',
+            'ast_purchaseorders.fabricPattern',
+            // รวมยอดส่งแล้ว: เอาแบบใหม่ก่อน ถ้าไม่มีค่อย fallback แบบเก่า
+            DB::raw('COALESCE(fo_so.delivered_folds_so, fo_id.delivered_folds_id, 0) AS delivered_folds'),
+            DB::raw('COALESCE(fo_so.delivered_yards_so, fo_id.delivered_yards_id, 0) AS delivered_yards'),
+            DB::raw('fa.fabric_w AS fabric_w')
+        )
+        // join กับยอดแบบใหม่ (SO ↔︎ SO)
+        ->leftJoinSub($foBySO, 'fo_so', function ($j) {
+            $j->on('fo_so.purchaseOrder', '=', 'ast_purchaseorders.purchaseOrder');
+        })
+        // join กับยอดแบบเก่า (orderId ↔︎ id)
+        ->leftJoinSub($foById, 'fo_id', function ($j) {
+            $j->on('fo_id.orderId', '=', 'ast_purchaseorders.id');
+        })
+        // join กับหน้ากว้าง (FabricAst.purchaseOrder ↔︎ ast_purchaseorders.id)
+        ->leftJoinSub($faAgg, 'fa', function ($j) {
+            $j->on('fa.purchaseOrder', '=', 'ast_purchaseorders.id');
+        })
+        ->whereIn('ast_purchaseorders.id', $ids)
+        ->orderBy('ast_purchaseorders.createDate', 'desc')
+        ->get();
+
+    // ---------- คงตัวแปรเก่าให้ view เดิมยังใช้ได้ ----------
+    $inventorydata = Inventory::select(
+            'refId',
+            DB::raw('SUM(fold) AS foldSum'),
+            DB::raw('SUM(sumYard) AS sumYardSum')
+        )
+        ->groupBy('refId')
+        ->get();
+
+    // (เดิม) รวมยอดส่งด้วย orderId — เผื่อ view เก่าใช้อยู่
+    $fabricoutdata = fabricout::select(
+            'orderId',
+            DB::raw('COUNT(fold) AS foldCount'),
+            DB::raw('SUM(sumYard) AS sumYardSum')
+        )
+        ->whereNotNull('orderId')
+        ->groupBy('orderId')
+        ->get();
+
+    // (เดิม) ดึง fabric_w ตาม id
+    $fabricoutdata2 = FabricAst::select('purchaseOrder','fabric_w')
+        ->whereIn('purchaseOrder', $ids)
+        ->get();
+
+    return view('inventory.index', compact(
+        'orders', 'inventorydata', 'fabricoutdata', 'fabricoutdata2'
+    ));
+}
+
+//โค้ดเดิม
+    public function index_back()
     {
         //
         //get all order status is except to manufacture.
