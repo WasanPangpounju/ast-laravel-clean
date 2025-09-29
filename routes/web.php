@@ -18,7 +18,7 @@ use App\Http\Controllers\OrdershippedController;
 use App\Http\Controllers\StockfabricController;
 use App\Http\Controllers\FabricoutController;
 use App\Http\Controllers\FabricdepositController;
-use App\Http\Controllers\FabriccheckController;
+// use App\Http\Controllers\FabriccheckController;
 use App\Http\Controllers\FabricoutDepositController;
 
 /*
@@ -61,7 +61,7 @@ Route::resource('ordershipped', OrdershippedController::class );
 Route::resource('stockfabric', StockfabricController::class );
 Route::resource('fabricout', FabricoutController::class );
 Route::resource('fabricdeposit', FabricdepositController::class );
-Route::resource('fabriccheck', FabriccheckController::class );
+// Route::resource('fabriccheck', FabriccheckController::class );
 Route::resource('fabricoutdeposit', FabricoutDepositController::class );
 
 Route::post('generate-pdf', 'PDFController@generatePDF')->name('generate-pdf');
