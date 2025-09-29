@@ -73,30 +73,32 @@ class FabriccheckController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+use Illuminate\Support\Facades\DB;
+
 public function store(Request $request)
 {
     if (!($request->filled('submit') && $request->submit === 'searchImport')) {
         return redirect()->route('fabriccheck.index');
     }
 
-    // ===== ค่าที่ได้มาจากปุ่ม "ตรวจสอบ" บนหน้า stock =====
-    $customer      = trim((string) $request->input('customer', ''));
-    $fabricId      = trim((string) $request->input('fabricId', ''));
-    $fabricStruct  = trim((string) $request->input('fabricStruct', ''));
-    $fabricPattern = trim((string) $request->input('fabricPattern', ''));
-    $fabricW       = trim((string) $request->input('fabricW', ''));
+    // ค่าที่ปุ่ม "ตรวจสอบ" ส่งมา (เอาค่าดิบจาก DB ให้เป๊ะที่สุด)
+    $customer      = (string) $request->input('customer', '');
+    $fabricId      = (string) $request->input('fabricId', '');
+    $fabricStruct  = (string) $request->input('fabricStruct', '');
+    $fabricPattern = (string) $request->input('fabricPattern', '');
+    $fabricW       = (string) $request->input('fabricW', '');
 
-    // ถ้าไม่มีอะไรให้กรองเลย ตัดกลับ index ทันทีเพื่อกันสแกนทั้งตาราง
+    // ถ้าไม่มีเงื่อนไขเลย ไม่อนุญาตให้สแกนทั้งตาราง
     if ($customer === '' && $fabricId === '' && $fabricStruct === '' && $fabricPattern === '' && $fabricW === '') {
         return redirect()->route('fabriccheck.index')->with('warn', 'กรุณาเลือกเงื่อนไขอย่างน้อย 1 อย่าง');
     }
 
-    // ===== ชั้นแรก: where แบบคัดแคบด้วยคอลัมน์แท้ ๆ (ไม่ใช้ฟังก์ชันบนคอลัมน์) =====
+    // ชั้นแรก: where ด้วยคอลัมน์ตรง ๆ (ไม่ใช้ TRIM/LOWER/LIKE %...%) เพื่อให้ใช้ index
     $pre = DB::table('stockfabrics as s');
 
     if ($customer !== '') {
-        if (mb_strtoupper($customer) === 'AST') {
-            // กรณีพิเศษ: 'AST' แปลว่า (NULL หรือ '' หรือ 'AST')
+        if (strtoupper($customer) === 'AST') {
+            // กรณี AST: ถือว่าเป็น (NULL / ว่าง / 'AST')
             $pre->where(function ($q) {
                 $q->whereNull('s.customer')->orWhere('s.customer', '')
                   ->orWhere('s.customer', 'AST');
@@ -105,61 +107,39 @@ public function store(Request $request)
             $pre->where('s.customer', $customer);
         }
     }
-    if ($fabricId !== '') {
-        $pre->where('s.fabricId', $fabricId);
-    }
-    if ($fabricStruct !== '') {
-        $pre->whereRaw('TRIM(s.fabricStruct) = ?', [$fabricStruct]);
-    }
-    if ($fabricPattern !== '') {
-        $pre->whereRaw('TRIM(s.fabricPattern) = ?', [$fabricPattern]);
-    }
-    if ($fabricW !== '') {
-        $pre->whereRaw('TRIM(s.fabricW) = ?', [$fabricW]);
-    }
+    if ($fabricId !== '')      $pre->where('s.fabricId', $fabricId);
+    if ($fabricStruct !== '')  $pre->where('s.fabricStruct', $fabricStruct);
+    if ($fabricPattern !== '') $pre->where('s.fabricPattern', $fabricPattern);
+    if ($fabricW !== '')       $pre->where('s.fabricW', $fabricW);
 
-    // ===== ทำซับคิวรี normalize คอลัมน์ แล้ว group by ที่ alias ปกติ (หลบ ONLY_FULL_GROUP_BY) =====
+    // โปรเจ็กต์คอลัมน์แบบ normalize ในชั้นซับคิวรี (GROUP BY จะอ้าง alias ที่ได้)
     $base = $pre->selectRaw("
-                COALESCE(NULLIF(TRIM(s.customer), ''), 'AST')  AS customer_norm,
-                s.fabricId                                     AS fabricId,
-                TRIM(s.fabricStruct)                           AS fabricStruct_norm,
-                TRIM(s.fabricPattern)                          AS fabricPattern_norm,
-                TRIM(s.fabricW)                                AS fabricW_norm,
-                s.createDate                                   AS createDate,
-                s.sumYard                                      AS sumYard,
-                s.refId                                        AS refId
-            ");
+        COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') AS customer,
+        s.fabricId                                    AS fabricId,
+        TRIM(s.fabricStruct)                          AS fabricStruct,
+        TRIM(s.fabricPattern)                         AS fabricPattern,
+        TRIM(s.fabricW)                               AS fabricW,
+        s.createDate                                  AS createDate,
+        s.sumYard                                     AS sumYard,
+        s.refId                                       AS refId
+    ");
 
     $importorder = DB::query()->fromSub($base, 't')
         ->selectRaw("
-            t.customer_norm      AS customer,
-            t.fabricId           AS fabricId,
-            t.fabricStruct_norm  AS fabricStruct,
-            t.fabricPattern_norm AS fabricPattern,
-            t.fabricW_norm       AS fabricW,
-            MAX(t.createDate)    AS lastCreateDate,
-            COUNT(*)             AS foldCount,
-            SUM(t.sumYard)       AS sumYardSum,
-            MIN(t.refId)         AS refId
+            customer, fabricId, fabricStruct, fabricPattern, fabricW,
+            MAX(createDate) AS lastCreateDate,
+            COUNT(*)        AS foldCount,
+            SUM(sumYard)    AS sumYardSum,
+            MIN(refId)      AS refId
         ")
-        ->groupBy('t.customer_norm', 't.fabricId', 't.fabricStruct_norm', 't.fabricPattern_norm', 't.fabricW_norm')
+        ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW')
         ->orderByDesc('lastCreateDate')
-        ->limit(200) // กันล้นหน้าจอ + ลดภาระ DB
+        ->limit(200)   // กันคิวรี/ผลลัพธ์ล้น
         ->get();
 
-    // รายการไว้ใช้ใน autocomplete
-    $stockFabricStruct = stockfabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW'])
-        ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
-        ->limit(500)
-        ->get();
-
-    // รายการกลุ่มล่าสุดทั้งหมด (ถ้า view ยังใช้)
-    $records = stockfabric::groupBy(['fabricId','refId','fabricStruct','fabricPattern','fabricW','customer'])
-        ->selectRaw('fabricId, customer, refId, fabricStruct, MAX(createDate) as lastCreateDate, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
-        ->orderByDesc('lastCreateDate')
-        ->limit(500)
-        ->get();
-    $allfabricout = $records;
+    // สำคัญ: ไม่สร้างคิวรีใหญ่ทั้งตารางในรอบค้นหา
+    $allfabricout      = collect(); // ว่าง
+    $stockFabricStruct = collect(); // ว่าง
 
     return view('fabricoutcheck.index', compact('importorder', 'stockFabricStruct', 'allfabricout'));
 }
