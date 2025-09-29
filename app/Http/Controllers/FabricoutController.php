@@ -573,6 +573,282 @@ public function create()
     }
 
     return back()->with('error','คำสั่งไม่ถูกต้อง');
+
+    // ---------- 6) พิมพ์ใบส่งของ ----------
+if ($request->filled('submit') && $request->submit === 'submitfabricout') {
+    $fabricout_no = (int) $request->input('fabricout_no');
+
+    if (!$fabricout_no) {
+        return back()->with('error', 'ไม่พบเลขบิลที่ต้องการพิมพ์');
+    }
+
+    return $this->printDeliveryPdf($fabricout_no); // เรียกเมธอดด้านล่าง
+}
+
+}
+
+private function printDeliveryPdf(int $fabricout_no)
+{
+    // 1) ดึงหัวบิล (สรุป)
+    $records = fabricout::where('no', $fabricout_no)
+        ->groupBy([
+            'vatType','vatNo','fabricStruct','fabricPattern','fabricW',
+            'no','refId','customerName','receiveName','customerReplace',
+            'fabricStructReplace','comment'
+        ])
+        ->selectRaw('
+            vatType, vatNo, fabricStruct, fabricPattern, fabricW,
+            no, refId, customerName, receiveName, customerReplace,
+            fabricStructReplace, comment,
+            COUNT(fold) AS foldCount,
+            SUM(sumYard) AS sumYardSum,
+            MAX(createDate) AS lastDate
+        ')
+        ->get();
+
+    if ($records->isEmpty()) {
+        return back()->with('error', 'ไม่พบข้อมูลเลขบิลนี้');
+    }
+
+    $r = $records->first();
+
+    // 2) ดึงรายการพับทั้งหมด (เรียงตาม fold)
+    $orders = fabricout::where('no', $fabricout_no)
+        ->orderBy('fold', 'asc')
+        ->get(['fold','sumYard']);
+
+    // 3) ตั้งค่าฟอนต์/หน้าเอกสาร
+    $this->fpdf = new Fpdf;
+    $this->fpdf->AddFont('THSarabunNew','', 'THSarabunNew.php');
+    $this->fpdf->AddFont('THSarabunNew','B','THSarabunNew_b.php');
+    $this->fpdf->AddPage();
+
+    // 4) Header
+    $this->fpdf->SetFont('THSarabunNew','B',20);
+    $this->fpdf->Cell(0, 8, iconv('UTF-8','cp874','ใบส่งสินค้า / Delivery Note'), 0, 1, 'C');
+
+    $this->fpdf->SetFont('THSarabunNew','',14);
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874', 'เลขที่: '.$r->vatType.' - '.$r->vatNo), 0, 1, 'R');
+
+    $this->fpdf->SetFont('THSarabunNew','',16);
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874', 'ผู้สั่ง (Order by): '.($r->customerReplace ?: $r->customerName)), 0, 1);
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874', 'ผู้รับ (Received by): '.$r->receiveName), 0, 1);
+
+    // ทำความสะอาดลายผ้าแบบเดิมของคุณ
+    $fabricPattern = $r->fabricPattern ?? '';
+    $cleanPattern  = preg_replace('/\(.*?\)/', '', $fabricPattern);
+    $cleanPattern  = trim($cleanPattern);
+    if (preg_match('/(\d+)\s*\/\s*(\d+)/', $cleanPattern, $m)) {
+        $patternDisplay = $m[1].'/'.$m[2];
+    } else {
+        $patternDisplay = $cleanPattern;
+    }
+
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874',
+        'รหัสผ้า (Code): '
+        . ($r->fabricStructReplace ?: $r->fabricStruct)
+        . '  ' . $r->fabricW ."''  ". $patternDisplay
+    ), 0, 1);
+
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874', 'วันที่ (Date): '.date('d/m/Y', strtotime($r->lastDate))), 0, 1);
+    if (!empty($r->comment)) {
+        $this->fpdf->MultiCell(0, 7, iconv('UTF-8','cp874', 'หมายเหตุ: '.$r->comment));
+    }
+
+    $this->fpdf->Ln(2);
+
+    // 5) ตารางรายการพับ (เวอร์ชันกระชับ)
+    $this->fpdf->SetFont('THSarabunNew','B',14);
+    $this->fpdf->Cell(30, 8, iconv('UTF-8','cp874','ลำดับ'), 1, 0, 'C');
+    $this->fpdf->Cell(50, 8, iconv('UTF-8','cp874','จำนวน (หลา)'), 1, 0, 'C');
+    $this->fpdf->Cell(30, 8, iconv('UTF-8','cp874','ลำดับ'), 1, 0, 'C');
+    $this->fpdf->Cell(50, 8, iconv('UTF-8','cp874','จำนวน (หลา)'), 1, 1, 'C');
+
+    $this->fpdf->SetFont('THSarabunNew','',14);
+
+    // แสดง 2 คอลัมน์ต่อแถว
+    $rows = $orders->values();
+    for ($i = 0; $i < $rows->count(); $i += 2) {
+        $left  = $rows[$i];
+        $right = $rows[$i+1] ?? null;
+
+        $this->fpdf->Cell(30, 7, iconv('UTF-8','cp874', $left->fold), 1, 0, 'C');
+        $this->fpdf->Cell(50, 7, iconv('UTF-8','cp874', number_format($left->sumYard, 2)), 1, 0, 'R');
+
+        if ($right) {
+            $this->fpdf->Cell(30, 7, iconv('UTF-8','cp874', $right->fold), 1, 0, 'C');
+            $this->fpdf->Cell(50, 7, iconv('UTF-8','cp874', number_format($right->sumYard, 2)), 1, 1, 'R');
+        } else {
+            // เว้นคอลัมน์ขวา
+            $this->fpdf->Cell(30, 7, '', 1, 0);
+            $this->fpdf->Cell(50, 7, '', 1, 1);
+        }
+    }
+
+    $this->fpdf->Ln(2);
+
+    // 6) รวม
+    $this->fpdf->SetFont('THSarabunNew','B',16);
+    $this->fpdf->Cell(0, 9, iconv('UTF-8','cp874',
+        'รวม: '.$r->foldCount.' พับ   |   '.number_format($r->sumYardSum,2).' หลา'
+    ), 0, 1, 'R');
+
+    // 7) ช่องเซ็นต์
+    $this->fpdf->Ln(8);
+    $this->fpdf->SetFont('THSarabunNew','B',14);
+    $this->fpdf->Cell(60, 28, iconv('UTF-8','cp874','      ตัวอย่างผ้า / Sample'), 1, 0, 'L');
+
+    $this->fpdf->Cell(20, 28, '', 0, 0); // เว้น
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874','ลงชื่อประทับตรา'), 0, 1);
+    $this->fpdf->SetFont('THSarabunNew','',14);
+    $this->fpdf->Cell(80, 7, '', 0, 0);
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874','Authorize Signature _________________________________'), 0, 1);
+
+    $this->fpdf->Ln(2);
+    $this->fpdf->SetFont('THSarabunNew','B',14);
+    $this->fpdf->Cell(80, 6, '', 0, 0);
+    $this->fpdf->Cell(0, 6, iconv('UTF-8','cp874','หมายเหตุ'), 0, 1);
+    $this->fpdf->SetFont('THSarabunNew','',12);
+    $this->fpdf->Cell(80, 5, '', 0, 0);
+    $this->fpdf->Cell(0, 5, iconv('UTF-8','cp874','ได้รับผ้าตามรายการข้างบนนี้ไว้ถูกต้องและเรียบร้อยแล้ว'), 0, 1);
+    $this->fpdf->Cell(80, 5, '', 0, 0);
+    $this->fpdf->Cell(0, 5, iconv('UTF-8','cp874','Received the above goods in good order and condition'), 0, 1);
+
+    // 8) ส่งไฟล์ออก
+    $this->fpdf->Output(); // จะส่งเป็น PDF ไปยังเบราว์เซอร์
+    exit;
+}
+
+private function printDeliveryPdf(int $fabricout_no)
+{
+    // 1) ดึงหัวบิล (สรุป)
+    $records = fabricout::where('no', $fabricout_no)
+        ->groupBy([
+            'vatType','vatNo','fabricStruct','fabricPattern','fabricW',
+            'no','refId','customerName','receiveName','customerReplace',
+            'fabricStructReplace','comment'
+        ])
+        ->selectRaw('
+            vatType, vatNo, fabricStruct, fabricPattern, fabricW,
+            no, refId, customerName, receiveName, customerReplace,
+            fabricStructReplace, comment,
+            COUNT(fold) AS foldCount,
+            SUM(sumYard) AS sumYardSum,
+            MAX(createDate) AS lastDate
+        ')
+        ->get();
+
+    if ($records->isEmpty()) {
+        return back()->with('error', 'ไม่พบข้อมูลเลขบิลนี้');
+    }
+
+    $r = $records->first();
+
+    // 2) ดึงรายการพับทั้งหมด (เรียงตาม fold)
+    $orders = fabricout::where('no', $fabricout_no)
+        ->orderBy('fold', 'asc')
+        ->get(['fold','sumYard']);
+
+    // 3) ตั้งค่าฟอนต์/หน้าเอกสาร
+    $this->fpdf = new Fpdf;
+    $this->fpdf->AddFont('THSarabunNew','', 'THSarabunNew.php');
+    $this->fpdf->AddFont('THSarabunNew','B','THSarabunNew_b.php');
+    $this->fpdf->AddPage();
+
+    // 4) Header
+    $this->fpdf->SetFont('THSarabunNew','B',20);
+    $this->fpdf->Cell(0, 8, iconv('UTF-8','cp874','ใบส่งสินค้า / Delivery Note'), 0, 1, 'C');
+
+    $this->fpdf->SetFont('THSarabunNew','',14);
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874', 'เลขที่: '.$r->vatType.' - '.$r->vatNo), 0, 1, 'R');
+
+    $this->fpdf->SetFont('THSarabunNew','',16);
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874', 'ผู้สั่ง (Order by): '.($r->customerReplace ?: $r->customerName)), 0, 1);
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874', 'ผู้รับ (Received by): '.$r->receiveName), 0, 1);
+
+    // ทำความสะอาดลายผ้าแบบเดิมของคุณ
+    $fabricPattern = $r->fabricPattern ?? '';
+    $cleanPattern  = preg_replace('/\(.*?\)/', '', $fabricPattern);
+    $cleanPattern  = trim($cleanPattern);
+    if (preg_match('/(\d+)\s*\/\s*(\d+)/', $cleanPattern, $m)) {
+        $patternDisplay = $m[1].'/'.$m[2];
+    } else {
+        $patternDisplay = $cleanPattern;
+    }
+
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874',
+        'รหัสผ้า (Code): '
+        . ($r->fabricStructReplace ?: $r->fabricStruct)
+        . '  ' . $r->fabricW ."''  ". $patternDisplay
+    ), 0, 1);
+
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874', 'วันที่ (Date): '.date('d/m/Y', strtotime($r->lastDate))), 0, 1);
+    if (!empty($r->comment)) {
+        $this->fpdf->MultiCell(0, 7, iconv('UTF-8','cp874', 'หมายเหตุ: '.$r->comment));
+    }
+
+    $this->fpdf->Ln(2);
+
+    // 5) ตารางรายการพับ (เวอร์ชันกระชับ)
+    $this->fpdf->SetFont('THSarabunNew','B',14);
+    $this->fpdf->Cell(30, 8, iconv('UTF-8','cp874','ลำดับ'), 1, 0, 'C');
+    $this->fpdf->Cell(50, 8, iconv('UTF-8','cp874','จำนวน (หลา)'), 1, 0, 'C');
+    $this->fpdf->Cell(30, 8, iconv('UTF-8','cp874','ลำดับ'), 1, 0, 'C');
+    $this->fpdf->Cell(50, 8, iconv('UTF-8','cp874','จำนวน (หลา)'), 1, 1, 'C');
+
+    $this->fpdf->SetFont('THSarabunNew','',14);
+
+    // แสดง 2 คอลัมน์ต่อแถว
+    $rows = $orders->values();
+    for ($i = 0; $i < $rows->count(); $i += 2) {
+        $left  = $rows[$i];
+        $right = $rows[$i+1] ?? null;
+
+        $this->fpdf->Cell(30, 7, iconv('UTF-8','cp874', $left->fold), 1, 0, 'C');
+        $this->fpdf->Cell(50, 7, iconv('UTF-8','cp874', number_format($left->sumYard, 2)), 1, 0, 'R');
+
+        if ($right) {
+            $this->fpdf->Cell(30, 7, iconv('UTF-8','cp874', $right->fold), 1, 0, 'C');
+            $this->fpdf->Cell(50, 7, iconv('UTF-8','cp874', number_format($right->sumYard, 2)), 1, 1, 'R');
+        } else {
+            // เว้นคอลัมน์ขวา
+            $this->fpdf->Cell(30, 7, '', 1, 0);
+            $this->fpdf->Cell(50, 7, '', 1, 1);
+        }
+    }
+
+    $this->fpdf->Ln(2);
+
+    // 6) รวม
+    $this->fpdf->SetFont('THSarabunNew','B',16);
+    $this->fpdf->Cell(0, 9, iconv('UTF-8','cp874',
+        'รวม: '.$r->foldCount.' พับ   |   '.number_format($r->sumYardSum,2).' หลา'
+    ), 0, 1, 'R');
+
+    // 7) ช่องเซ็นต์
+    $this->fpdf->Ln(8);
+    $this->fpdf->SetFont('THSarabunNew','B',14);
+    $this->fpdf->Cell(60, 28, iconv('UTF-8','cp874','      ตัวอย่างผ้า / Sample'), 1, 0, 'L');
+
+    $this->fpdf->Cell(20, 28, '', 0, 0); // เว้น
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874','ลงชื่อประทับตรา'), 0, 1);
+    $this->fpdf->SetFont('THSarabunNew','',14);
+    $this->fpdf->Cell(80, 7, '', 0, 0);
+    $this->fpdf->Cell(0, 7, iconv('UTF-8','cp874','Authorize Signature _________________________________'), 0, 1);
+
+    $this->fpdf->Ln(2);
+    $this->fpdf->SetFont('THSarabunNew','B',14);
+    $this->fpdf->Cell(80, 6, '', 0, 0);
+    $this->fpdf->Cell(0, 6, iconv('UTF-8','cp874','หมายเหตุ'), 0, 1);
+    $this->fpdf->SetFont('THSarabunNew','',12);
+    $this->fpdf->Cell(80, 5, '', 0, 0);
+    $this->fpdf->Cell(0, 5, iconv('UTF-8','cp874','ได้รับผ้าตามรายการข้างบนนี้ไว้ถูกต้องและเรียบร้อยแล้ว'), 0, 1);
+    $this->fpdf->Cell(80, 5, '', 0, 0);
+    $this->fpdf->Cell(0, 5, iconv('UTF-8','cp874','Received the above goods in good order and condition'), 0, 1);
+
+    // 8) ส่งไฟล์ออก
+    $this->fpdf->Output(); // จะส่งเป็น PDF ไปยังเบราว์เซอร์
+    exit;
 }
 
 private function saveFabricDataBack2(
