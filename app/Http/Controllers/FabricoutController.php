@@ -163,7 +163,109 @@ class FabricoutController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+// ใช้ด้านบนของไฟล์แล้วมี use Illuminate\Support\Facades\DB; อยู่แล้ว
+
+public function create()
+{
+    if (session()->get('endCount') <= 0) {
+        session()->forget([
+            'endCount','dt','customerName','receiveName','comment','receiveType','orderId',
+            'fabricStruct','fabricPattern','fabricW','customerReplace','fabricStructReplace',
+            'vatNo','vatType'
+        ]);
+    }
+
+    $ecp = FabricAststructure::select('purchaseOrder AS id')
+        ->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
+
+    $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
+        ->whereIn('id', $ecp)->orderBy('customerName')->get();
+
+    // เลขบิลแยกตามประเภท
+    $lastVat = Fabricout::groupBy('vatType')
+        ->select('vatType', Fabricout::raw('MAX(vatNo) as max_no'))->get();
+    $vatA='1001'; $vatB='1001'; $vatC='1001';
+    foreach ($lastVat as $v) {
+        if ($v->vatType==='A') $vatA = $v->max_no ? $v->max_no+1 : '1001';
+        if ($v->vatType==='B') $vatB = $v->max_no ? $v->max_no+1 : '1001';
+        if ($v->vatType==='C') $vatC = $v->max_no ? $v->max_no+1 : '1001';
+    }
+
+    $lastRecord = Fabricout::latest()->first();
+    $no = $lastRecord ? ($lastRecord->no + 1) : 1001;
+    if (!session()->has('no')) session()->put('no', $no);
+
+    $customers = Customer::orderBy('name')->get();
+
+    $order_id = '';
+    $customer_name = '';
+    $fabric_struct = '';
+
+    // ---------- สำคัญ: ดึง “สต็อกคงเหลือ” ต่อกุญแจ (customer+struct+pattern+width) ----------
+    $ins = DB::table('stockfabrics')
+        ->selectRaw("
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+            fabricStruct, fabricPattern, fabricW,
+            COUNT(fold) AS folds_in,
+            SUM(sumYard) AS yards_in,
+            MAX(createDate) AS lastDate
+        ")
+        ->groupBy('customer','fabricStruct','fabricPattern','fabricW')
+        ->get();
+
+    $outs = DB::table('fabricouts')
+        ->selectRaw("
+            COALESCE(NULLIF(TRIM(stockCustomer), ''), 'AST') AS customer,
+            stockFabricStruct AS fabricStruct,
+            stockFabricPattern AS fabricPattern,
+            stockFabricW AS fabricW,
+            COUNT(fold) AS folds_out,
+            SUM(sumYard) AS yards_out
+        ")
+        ->whereNotNull('stockFabricStruct') // เฉพาะอันที่เลือกสต็อกจริง ๆ
+        ->groupBy('customer','fabricStruct','fabricPattern','fabricW')
+        ->get();
+
+    // รวมยอดคงเหลือ
+    $stockLots = $ins->map(function($in) use ($outs) {
+        $out = $outs->first(function($o) use ($in){
+            return $o->customer      === $in->customer
+                && $o->fabricStruct  === $in->fabricStruct
+                && $o->fabricPattern === $in->fabricPattern
+                && $o->fabricW       === $in->fabricW;
+        });
+
+        $foldsOut = $out->folds_out ?? 0;
+        $yardsOut = $out->yards_out ?? 0;
+
+        return (object)[
+            'customer'        => $in->customer,
+            'fabricStruct'    => $in->fabricStruct,
+            'fabricPattern'   => $in->fabricPattern,
+            'fabricW'         => $in->fabricW,
+            'foldsIn'         => (int)$in->folds_in,
+            'yardsIn'         => (float)$in->yards_in,
+            'foldsOut'        => (int)$foldsOut,
+            'yardsOut'        => (float)$yardsOut,
+            'foldsRemaining'  => max(0, (int)$in->folds_in - (int)$foldsOut),
+            'yardsRemaining'  => max(0, (float)$in->yards_in - (float)$yardsOut),
+            'lastDate'        => $in->lastDate,
+        ];
+    })
+    // เอาเฉพาะรายการที่ยังมีคงเหลือ
+    ->filter(fn($r) => ($r->foldsRemaining > 0) || ($r->yardsRemaining > 0))
+    // จัดเรียงให้เลือกง่าย: มากไปน้อยตาม yardsRemaining
+    ->sortByDesc('yardsRemaining')
+    ->values();
+
+    return view('fabricout.create', compact(
+        'customers','order_id','customer_name','fabric_struct',
+        'orders','vatA','vatB','vatC','stockLots'
+    ));
+}
+
+    
+    public function create_back()
     {
         //
         if (session()->get('endCount') <= 0) {
