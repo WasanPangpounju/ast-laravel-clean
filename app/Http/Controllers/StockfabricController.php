@@ -62,55 +62,70 @@ class StockfabricController extends Controller
      */
 private function getCombinedData($customer = null, $fabricStruct = null, $fabricId = null, $fabricPattern = null, $fabricW = null)
 {
-    // ---------- 1) สต็อกเข้า ----------
+    // ---------- 1) สต็อกเข้า (normalize + group โดยใช้ expression จริง) ----------
+    $insCustomerExpr = "COALESCE(NULLIF(TRIM(customer), ''), 'AST')";
+    $insStructExpr   = "TRIM(fabricStruct)";
+    $insPatternExpr  = "TRIM(fabricPattern)";
+    $insWidthExpr    = "TRIM(fabricW)";
+
     $stockInsQuery = \DB::table('stockfabrics')
         ->selectRaw("
-            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+            {$insCustomerExpr} AS customer,
             fabricId,
-            TRIM(fabricStruct)  AS fabricStruct,
-            TRIM(fabricPattern) AS fabricPattern,
-            TRIM(fabricW)       AS fabricW,
-            COUNT(fold)  AS foldCountIn,
+            {$insStructExpr}   AS fabricStruct,
+            {$insPatternExpr}  AS fabricPattern,
+            {$insWidthExpr}    AS fabricW,
+            COUNT(*)  AS foldCountIn,
             SUM(sumYard) AS sumYardIn
         ")
-        ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW');
+        ->groupByRaw("{$insCustomerExpr}, fabricId, {$insStructExpr}, {$insPatternExpr}, {$insWidthExpr}");
 
-    // เงื่อนไขค้นหาฝั่งเข้า
-    if ($customer)      $stockInsQuery->where('customer',      'like', '%'.$customer.'%');
-    if ($fabricStruct)  $stockInsQuery->where('fabricStruct',  'like', '%'.$fabricStruct.'%');
-    if ($fabricId)      $stockInsQuery->where('fabricId',      'like', '%'.$fabricId.'%');
-    if ($fabricPattern) $stockInsQuery->where('fabricPattern', 'like', '%'.$fabricPattern.'%');
-    if ($fabricW)       $stockInsQuery->where('fabricW',       'like', '%'.$fabricW.'%');
+    // เงื่อนไขค้นหา (ฟิลเตอร์บนคอลัมน์ที่ normalize แล้ว)
+    if ($customer)      $stockInsQuery->whereRaw("{$insCustomerExpr} LIKE ?", ['%'.$customer.'%']);
+    if ($fabricStruct)  $stockInsQuery->whereRaw("{$insStructExpr}   LIKE ?", ['%'.$fabricStruct.'%']);
+    if ($fabricId)      $stockInsQuery->where('fabricId', 'like', '%'.$fabricId.'%');
+    if ($fabricPattern) $stockInsQuery->whereRaw("{$insPatternExpr}  LIKE ?", ['%'.$fabricPattern.'%']);
+    if ($fabricW)       $stockInsQuery->whereRaw("{$insWidthExpr}    LIKE ?", ['%'.$fabricW.'%']);
 
     $stockIns = $stockInsQuery->get();
 
-    // ---------- 2) สต็อกออก (เลือกใช้คีย์ stock* ถ้ามี ไม่งั้นใช้ของเดิม) ----------
-    $customerExpr = "COALESCE(NULLIF(TRIM(CASE WHEN stockCustomer IS NULL OR stockCustomer = '' THEN customerName ELSE stockCustomer END), ''), 'AST')";
-    $structExpr   = "TRIM(CASE WHEN stockFabricStruct  IS NULL OR stockFabricStruct  = '' THEN fabricStruct  ELSE stockFabricStruct  END)";
-    $patternExpr  = "TRIM(CASE WHEN stockFabricPattern IS NULL OR stockFabricPattern = '' THEN fabricPattern ELSE stockFabricPattern END)";
-    $widthExpr    = "TRIM(CASE WHEN stockFabricW       IS NULL OR stockFabricW       = '' THEN fabricW       ELSE stockFabricW       END)";
+    // ---------- 2) สต็อกออก: ทำ subquery ให้ได้คีย์ normalize แล้วค่อย group ----------
+    $outCustomerExpr = "COALESCE(NULLIF(TRIM(CASE WHEN stockCustomer IS NULL OR stockCustomer = '' THEN customerName ELSE stockCustomer END), ''), 'AST')";
+    $outStructExpr   = "TRIM(CASE WHEN stockFabricStruct  IS NULL OR stockFabricStruct  = '' THEN fabricStruct  ELSE stockFabricStruct  END)";
+    $outPatternExpr  = "TRIM(CASE WHEN stockFabricPattern IS NULL OR stockFabricPattern = '' THEN fabricPattern ELSE stockFabricPattern END)";
+    $outWidthExpr    = "TRIM(CASE WHEN stockFabricW       IS NULL OR stockFabricW       = '' THEN fabricW       ELSE stockFabricW       END)";
 
-    $stockOutsQuery = \DB::table('fabricouts')
+    // subquery: สร้างคอลัมน์ normalize แล้ว
+    $outsSub = \DB::table('fabricouts')
         ->selectRaw("
-            {$customerExpr} AS customer,
-            {$structExpr}   AS fabricStruct,
-            {$patternExpr}  AS fabricPattern,
-            {$widthExpr}    AS fabricW,
-            COUNT(fold)  AS foldCountOut,
+            {$outCustomerExpr} AS customer,
+            {$outStructExpr}   AS fabricStruct,
+            {$outPatternExpr}  AS fabricPattern,
+            {$outWidthExpr}    AS fabricW,
+            fold,
+            sumYard
+        ");
+
+    // outer query: group บนคอลัมน์ที่คำนวณแล้ว (เลี่ยง ONLY_FULL_GROUP_BY)
+    $stockOutsQuery = \DB::query()
+        ->fromSub($outsSub, 'fo')
+        ->selectRaw("
+            customer, fabricStruct, fabricPattern, fabricW,
+            COUNT(*) AS foldCountOut,
             SUM(sumYard) AS sumYardOut
         ")
-        ->groupByRaw("{$customerExpr}, {$structExpr}, {$patternExpr}, {$widthExpr}");
+        ->groupBy('customer','fabricStruct','fabricPattern','fabricW');
 
-    // เงื่อนไขค้นหาฝั่งออก ให้ฟิลเตอร์บน "นิพจน์รวมคีย์"
-    if ($customer)      $stockOutsQuery->whereRaw("{$customerExpr} LIKE ?", ['%'.$customer.'%']);
-    if ($fabricStruct)  $stockOutsQuery->whereRaw("{$structExpr}   LIKE ?", ['%'.$fabricStruct.'%']);
-    if ($fabricPattern) $stockOutsQuery->whereRaw("{$patternExpr}  LIKE ?", ['%'.$fabricPattern.'%']);
-    if ($fabricW)       $stockOutsQuery->whereRaw("{$widthExpr}    LIKE ?", ['%'.$fabricW.'%']);
-    // หมายเหตุ: ฝั่งออกไม่มี fabricId ให้ฟิลเตอร์ จึงข้ามไป
+    // ฟิลเตอร์บนคอลัมน์ normalize แล้ว (ใน subquery)
+    if ($customer)      $stockOutsQuery->where('customer',      'like', '%'.$customer.'%');
+    if ($fabricStruct)  $stockOutsQuery->where('fabricStruct',  'like', '%'.$fabricStruct.'%');
+    if ($fabricPattern) $stockOutsQuery->where('fabricPattern', 'like', '%'.$fabricPattern.'%');
+    if ($fabricW)       $stockOutsQuery->where('fabricW',       'like', '%'.$fabricW.'%');
 
     $stockOuts = $stockOutsQuery->get();
 
-    // ---------- 3) รวมผลโดยทำดัชนีฝั่งออก (เร็วและแม่นกว่าเทียบวน) ----------
+    // ---------- 3) รวมผล ----------
+    // ทำดัชนีฝั่งออกเพื่อจับคู่เร็ว
     $outsIndex = [];
     foreach ($stockOuts as $o) {
         $key = strtoupper(trim($o->customer)).'|'
@@ -146,13 +161,13 @@ private function getCombinedData($customer = null, $fabricStruct = null, $fabric
         ];
     });
 
-    // ถ้าต้องการแสดงเฉพาะที่เหลือ > 0 ให้ปลดคอมเมนต์บรรทัดล่างนี้
+    // ถ้าต้องการโชว์เฉพาะที่เหลือ > 0:
     // $combined = $combined->filter(fn($r) => $r->foldCountRemaining > 0 || $r->sumYardRemaining > 0)->values();
 
     return $combined;
 }
 
-
+    
     private function getCombinedData_back($customer = null, $fabricStruct = null, $fabricId = null, $fabricPattern = null, $fabricW = null)
     {
         // Base query for stock-in data
