@@ -74,16 +74,18 @@ class FabriccheckController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+public function store(Request $request)
 {
-    // กัน timeout ระดับ PHP (แต่อย่าพึ่งพาอันนี้)
+    // กัน timeout ฝั่ง PHP (แต่จริง ๆ ควรพึ่งการทำคิวรีให้เร็วเป็นหลัก)
     @set_time_limit(0);
     @ini_set('max_execution_time', '0');
 
-    if (!($request->filled('submit') && $request->submit === 'searchImport'))) {
+    // ⛏️ แก้วงเล็บบรรทัดนี้ (เหลือแค่ 2 ตัวปิด)
+    if (!($request->filled('submit') && $request->submit === 'searchImport')) {
         return redirect()->route('fabriccheck.index');
     }
 
+    // เงื่อนไขที่ส่งมาจากปุ่ม "ตรวจสอบ"
     $customer      = (string) $request->input('customer', '');
     $fabricId      = (string) $request->input('fabricId', '');
     $fabricStruct  = (string) $request->input('fabricStruct', '');
@@ -92,22 +94,25 @@ class FabriccheckController extends Controller
 
     // ต้องมีเงื่อนไขอย่างน้อย 1
     if ($customer === '' && $fabricId === '' && $fabricStruct === '' && $fabricPattern === '' && $fabricW === '') {
-        return redirect()->route('fabriccheck.index')->with('warn','กรุณาเลือกเงื่อนไขอย่างน้อย 1 อย่าง');
+        return redirect()->route('fabriccheck.index')->with('warn', 'กรุณาเลือกเงื่อนไขอย่างน้อย 1 อย่าง');
     }
 
-    // ถ้าไม่มี fabricId บังคับให้มีอย่างน้อย 2 เงื่อนไข เพื่อกัน full-scan/fallback หนักๆ
-    $filled = collect([$customer,$fabricStruct,$fabricPattern,$fabricW])->filter(fn($v)=>$v!=='')->count();
+    // บังคับความแคบของการค้นหา หากไม่มี fabricId ให้มีอย่างน้อย 2 เงื่อนไข
+    $filled = collect([$customer, $fabricStruct, $fabricPattern, $fabricW])
+        ->filter(fn($v) => $v !== '')
+        ->count();
+
     if ($fabricId === '' && $filled < 2) {
-        return redirect()->route('fabriccheck.index')->with('warn','กรุณาระบุอย่างน้อย 2 เงื่อนไข หรือส่งรหัสผ้า (fabricId)');
+        return redirect()->route('fabriccheck.index')->with('warn', 'กรุณาระบุอย่างน้อย 2 เงื่อนไข หรือระบุรหัสผ้า (fabricId)');
     }
 
-    // ---------- รอบที่ 1: คิวรีตรงคอลัมน์ (เร็ว ใช้ index ได้) ----------
+    // ชั้นแรก: where ตรงคอลัมน์ (ใช้ index ได้)
     $pre = DB::table('stockfabrics as s');
 
     if ($customer !== '') {
         if (strtoupper($customer) === 'AST') {
             $pre->where(function ($q) {
-                $q->whereNull('s.customer')->orWhere('s.customer','')->orWhere('s.customer','AST');
+                $q->whereNull('s.customer')->orWhere('s.customer', '')->orWhere('s.customer', 'AST');
             });
         } else {
             $pre->where('s.customer', $customer);
@@ -118,6 +123,7 @@ class FabriccheckController extends Controller
     if ($fabricPattern !== '') $pre->where('s.fabricPattern', $fabricPattern);
     if ($fabricW       !== '') $pre->where('s.fabricW', $fabricW);
 
+    // สร้างซับคิวรี (normalize บางค่าเพื่อ group ได้ถูก)
     $base = $pre->selectRaw("
         COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') AS customer,
         s.fabricId                                    AS fabricId,
@@ -129,6 +135,7 @@ class FabriccheckController extends Controller
         s.refId                                       AS refId
     ");
 
+    // ดึงผลสรุปแบบ grouped
     $importorder = DB::query()->fromSub($base, 't')
         ->selectRaw("
             customer, fabricId, fabricStruct, fabricPattern, fabricW,
@@ -137,124 +144,17 @@ class FabriccheckController extends Controller
             SUM(sumYard)    AS sumYardSum,
             MIN(refId)      AS refId
         ")
-        ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW')
+        ->groupBy('customer', 'fabricId', 'fabricStruct', 'fabricPattern', 'fabricW')
         ->orderByDesc('lastCreateDate')
         ->limit(500)
         ->get();
 
-    // ---------- รอบที่ 2 (fallback): ใช้คอลัมน์ normalized ถ้ามี index รองรับ ----------
-    if ($importorder->isEmpty()) {
-        $hasNormStruct  = Schema::hasColumn('stockfabrics','fabricStruct_norm');
-        $hasNormPattern = Schema::hasColumn('stockfabrics','fabricPattern_norm');
-        $hasNormW       = Schema::hasColumn('stockfabrics','fabricW_norm');
-
-        if ($hasNormStruct || $hasNormPattern || $hasNormW) {
-            $pre = DB::table('stockfabrics as s');
-
-            if ($customer !== '') {
-                if (strtoupper($customer) === 'AST') {
-                    $pre->where(function ($q) {
-                        $q->whereNull('s.customer')->orWhere('s.customer','')->orWhere('s.customer','AST');
-                    });
-                } else {
-                    $pre->where('s.customer', $customer);
-                }
-            }
-            if ($fabricId !== '') $pre->where('s.fabricId', $fabricId);
-
-            // แปลงค่าเป้าหมายให้ตรงกับ normalized columns
-            $toNorm = function($v){
-                return mb_strtolower(str_replace([' ', '×'],'',[''.trim($v)]));
-            };
-            if ($fabricStruct  !== '' && $hasNormStruct)  $pre->where('s.fabricStruct_norm',  $toNorm($fabricStruct));
-            if ($fabricPattern !== '' && $hasNormPattern) $pre->where('s.fabricPattern_norm', $toNorm($fabricPattern));
-            if ($fabricW       !== '' && $hasNormW)       $pre->where('s.fabricW_norm',       $toNorm($fabricW));
-
-            $base = $pre->selectRaw("
-                COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') AS customer,
-                s.fabricId                                    AS fabricId,
-                TRIM(s.fabricStruct)                          AS fabricStruct,
-                TRIM(s.fabricPattern)                         AS fabricPattern,
-                TRIM(s.fabricW)                               AS fabricW,
-                s.createDate                                  AS createDate,
-                s.sumYard                                     AS sumYard,
-                s.refId                                       AS refId
-            ");
-
-            $importorder = DB::query()->fromSub($base, 't')
-                ->selectRaw("
-                    customer, fabricId, fabricStruct, fabricPattern, fabricW,
-                    MAX(createDate) AS lastCreateDate,
-                    COUNT(*)        AS foldCount,
-                    SUM(sumYard)    AS sumYardSum,
-                    MIN(refId)      AS refId
-                ")
-                ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW')
-                ->orderByDesc('lastCreateDate')
-                ->limit(500)
-                ->get();
-        }
-        else {
-            // *** ไม่มี normalized columns → อย่ารัน fallback หนัก ๆ ถ้าเงื่อนไขบางเกิน ***
-            if ($fabricId === '' && $filled < 3) {
-                return redirect()->route('fabriccheck.index')->with('warn','ค้นหาแคบไม่พอ (ยังไม่มีดัชนี normalize) กรุณาเพิ่มเงื่อนไขอีก 1 อย่าง หรือระบุ fabricId');
-            }
-
-            // fallback แบบ function-based (ช้า) — รันเฉพาะเมื่อมีตัวกรองพอสมควร
-            $norm = function ($col) {
-                return DB::raw("REPLACE(REPLACE(LOWER(TRIM($col)), ' ', ''), '×', 'x')");
-            };
-            $pre = DB::table('stockfabrics as s');
-            if ($customer !== '') {
-                if (strtoupper($customer) === 'AST') {
-                    $pre->where(function ($q) {
-                        $q->whereNull('s.customer')->orWhere('s.customer','')->orWhere('s.customer','AST');
-                    });
-                } else {
-                    $pre->where('s.customer', $customer);
-                }
-            }
-            if ($fabricId !== '') $pre->where('s.fabricId',$fabricId);
-
-            $toNeedle = function($v){
-                return mb_strtolower(str_replace([' ','×'],'',[''.trim($v)]));
-            };
-            if ($fabricStruct  !== '') $pre->where($norm('s.fabricStruct'),  '=', $toNeedle($fabricStruct));
-            if ($fabricPattern !== '') $pre->where($norm('s.fabricPattern'), '=', $toNeedle($fabricPattern));
-            if ($fabricW       !== '') $pre->where($norm('s.fabricW'),       '=', $toNeedle($fabricW));
-
-            $base = $pre->selectRaw("
-                COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') AS customer,
-                s.fabricId                                    AS fabricId,
-                TRIM(s.fabricStruct)                          AS fabricStruct,
-                TRIM(s.fabricPattern)                         AS fabricPattern,
-                TRIM(s.fabricW)                               AS fabricW,
-                s.createDate                                  AS createDate,
-                s.sumYard                                     AS sumYard,
-                s.refId                                       AS refId
-            ");
-
-            $importorder = DB::query()->fromSub($base, 't')
-                ->selectRaw("
-                    customer, fabricId, fabricStruct, fabricPattern, fabricW,
-                    MAX(createDate) AS lastCreateDate,
-                    COUNT(*)        AS foldCount,
-                    SUM(sumYard)    AS sumYardSum,
-                    MIN(refId)      AS refId
-                ")
-                ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW')
-                ->orderByDesc('lastCreateDate')
-                ->limit(500)
-                ->get();
-        }
-    }
-
-    $allfabricout      = collect(); // ไม่ดึงก้อนใหญ่
+    // ไม่โหลดก้อนใหญ่ที่ไม่จำเป็น
+    $allfabricout      = collect();
     $stockFabricStruct = collect();
 
-    return view('fabricoutcheck.index', compact('importorder','stockFabricStruct','allfabricout'));
+    return view('fabricoutcheck.index', compact('importorder', 'stockFabricStruct', 'allfabricout'));
 }
-
 
     public function store_back(Request $request)
     {
