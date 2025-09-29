@@ -74,18 +74,18 @@ class FabriccheckController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-public function store(Request $request)
+    public function store(Request $request)
 {
-    // กัน timeout ฝั่ง PHP (แต่จริง ๆ ควรพึ่งการทำคิวรีให้เร็วเป็นหลัก)
+    // ป้องกัน timeout ระหว่างเทส (แต่อย่าใช้เป็นการแก้ปัญหาระยะยาว)
     @set_time_limit(0);
     @ini_set('max_execution_time', '0');
 
-    // ⛏️ แก้วงเล็บบรรทัดนี้ (เหลือแค่ 2 ตัวปิด)
+    // ❗️อย่ามีวงเล็บปิดเกิน
     if (!($request->filled('submit') && $request->submit === 'searchImport')) {
         return redirect()->route('fabriccheck.index');
     }
 
-    // เงื่อนไขที่ส่งมาจากปุ่ม "ตรวจสอบ"
+    // รับค่าจากปุ่ม "ตรวจสอบ"
     $customer      = (string) $request->input('customer', '');
     $fabricId      = (string) $request->input('fabricId', '');
     $fabricStruct  = (string) $request->input('fabricStruct', '');
@@ -94,36 +94,30 @@ public function store(Request $request)
 
     // ต้องมีเงื่อนไขอย่างน้อย 1
     if ($customer === '' && $fabricId === '' && $fabricStruct === '' && $fabricPattern === '' && $fabricW === '') {
-        return redirect()->route('fabriccheck.index')->with('warn', 'กรุณาเลือกเงื่อนไขอย่างน้อย 1 อย่าง');
+        return redirect()->route('fabriccheck.index')->with('warn','กรุณาเลือกเงื่อนไขอย่างน้อย 1 อย่าง');
     }
 
-    // บังคับความแคบของการค้นหา หากไม่มี fabricId ให้มีอย่างน้อย 2 เงื่อนไข
-    $filled = collect([$customer, $fabricStruct, $fabricPattern, $fabricW])
-        ->filter(fn($v) => $v !== '')
-        ->count();
-
-    if ($fabricId === '' && $filled < 2) {
-        return redirect()->route('fabriccheck.index')->with('warn', 'กรุณาระบุอย่างน้อย 2 เงื่อนไข หรือระบุรหัสผ้า (fabricId)');
-    }
-
-    // ชั้นแรก: where ตรงคอลัมน์ (ใช้ index ได้)
-    $pre = DB::table('stockfabrics as s');
+    // ชั้นคัดกรองแรก: where แบบเป๊ะ เพื่อให้ใช้ index
+    $pre = \DB::table('stockfabrics as s');
 
     if ($customer !== '') {
         if (strtoupper($customer) === 'AST') {
+            // null/ว่าง/AST ถือเป็น AST เหมือนกัน
             $pre->where(function ($q) {
-                $q->whereNull('s.customer')->orWhere('s.customer', '')->orWhere('s.customer', 'AST');
+                $q->whereNull('s.customer')
+                  ->orWhere('s.customer', '')
+                  ->orWhere('s.customer', 'AST');
             });
         } else {
             $pre->where('s.customer', $customer);
         }
     }
-    if ($fabricId      !== '') $pre->where('s.fabricId', $fabricId);
-    if ($fabricStruct  !== '') $pre->where('s.fabricStruct', $fabricStruct);
+    if ($fabricId !== '')      $pre->where('s.fabricId', $fabricId);
+    if ($fabricStruct !== '')  $pre->where('s.fabricStruct', $fabricStruct);
     if ($fabricPattern !== '') $pre->where('s.fabricPattern', $fabricPattern);
-    if ($fabricW       !== '') $pre->where('s.fabricW', $fabricW);
+    if ($fabricW !== '')       $pre->where('s.fabricW', $fabricW);
 
-    // สร้างซับคิวรี (normalize บางค่าเพื่อ group ได้ถูก)
+    // ทำซับคิวรี normalize ค่าที่ต้อง group
     $base = $pre->selectRaw("
         COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') AS customer,
         s.fabricId                                    AS fabricId,
@@ -135,8 +129,8 @@ public function store(Request $request)
         s.refId                                       AS refId
     ");
 
-    // ดึงผลสรุปแบบ grouped
-    $importorder = DB::query()->fromSub($base, 't')
+    // สรุปผล
+    $importorder = \DB::query()->fromSub($base, 't')
         ->selectRaw("
             customer, fabricId, fabricStruct, fabricPattern, fabricW,
             MAX(createDate) AS lastCreateDate,
@@ -144,12 +138,12 @@ public function store(Request $request)
             SUM(sumYard)    AS sumYardSum,
             MIN(refId)      AS refId
         ")
-        ->groupBy('customer', 'fabricId', 'fabricStruct', 'fabricPattern', 'fabricW')
+        ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW')
         ->orderByDesc('lastCreateDate')
-        ->limit(500)
+        ->limit(200)
         ->get();
 
-    // ไม่โหลดก้อนใหญ่ที่ไม่จำเป็น
+    // ไม่โหลดข้อมูลหนัก ๆ เพิ่มในรอบค้นหา
     $allfabricout      = collect();
     $stockFabricStruct = collect();
 
