@@ -364,6 +364,16 @@ public function create()
 
     public function store(Request $request)
 {
+    
+        /* ---------- 0) สั่งใบส่ง (PDF) ---------- */
+    if ($request->filled('submit') && $request->submit === 'submitfabricout') {
+        $fabricout_no = (int) $request->input('fabricout_no');
+        if (!$fabricout_no) {
+            return back()->with('error', 'ไม่พบเลขบิล');
+        }
+        return $this->printDeliveryPdf($fabricout_no); // <<<<< สำคัญ: return ตรงนี้เลย
+    }
+
     /* ---------- 1) ค้นหา ---------- */
     if ($request->filled('submit') && $request->submit === 'searchImport') {
         $select_search = 'findNo';
@@ -574,18 +584,60 @@ public function create()
 
     return back()->with('error','คำสั่งไม่ถูกต้อง');
 
-    // ---------- 6) พิมพ์ใบส่งของ ----------
-if ($request->filled('submit') && $request->submit === 'submitfabricout') {
-    $fabricout_no = (int) $request->input('fabricout_no');
+    
+}
 
-    if (!$fabricout_no) {
-        return back()->with('error', 'ไม่พบเลขบิลที่ต้องการพิมพ์');
+private function printDeliveryPdf(int $fabricout_no)
+{
+    // 1) query ข้อมูลหัวบิล + ไลน์รายการ (ของเดิมคุณ)
+    $records = fabricout::where('no', $fabricout_no)
+        ->groupBy([
+            'vatType','vatNo','fabricStruct','fabricPattern','fabricW',
+            'no','refId','customerName','receiveName','customerReplace',
+            'fabricStructReplace','comment'
+        ])
+        ->selectRaw("
+            vatType, vatNo, fabricStruct, fabricPattern, fabricW,
+            no, refId, customerName, receiveName, customerReplace,
+            fabricStructReplace, comment,
+            COUNT(fold) AS foldCount,
+            SUM(sumYard) AS sumYardSum,
+            MAX(createDate) AS lastDate
+        ")
+        ->get();
+
+    $orders = fabricout::selectRaw('no,fold,sumYard')
+        ->where('no', $fabricout_no)
+        ->orderBy('fold','asc')
+        ->get();
+
+    if ($records->isEmpty()) {
+        return back()->with('error','ไม่พบข้อมูลใบส่งของ');
     }
 
-    return $this->printDeliveryPdf($fabricout_no); // เรียกเมธอดด้านล่าง
+    $head = $records[0];
+    $vatType = $head->vatType;
+    $vatNo   = $head->vatNo;
+
+    // 2) สร้าง PDF ด้วย FPDF (โค้ดของคุณตามเดิม)
+    $this->fpdf = new Fpdf;
+    $this->fpdf->AddFont('THSarabunNew','', 'THSarabunNew.php');
+    $this->fpdf->AddFont('THSarabunNew','B','THSarabunNew_b.php');
+    $this->fpdf->AddPage();
+    // ... วาดหัวกระดาษ/ตาราง/รวม ฯลฯ ตามเดิม ...
+
+    // 3) แทนที่จะ Output() แล้ว exit ให้ดึงเป็น string แล้ว return response
+    $pdfBinary = $this->fpdf->Output('S'); // S = return as string
+    $filename  = "Delivery_{$vatType}-{$vatNo}.pdf";
+
+    return response($pdfBinary, 200, [
+        'Content-Type'        => 'application/pdf',
+        'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        'Cache-Control'       => 'private, max-age=0, must-revalidate',
+        'Pragma'              => 'public',
+    ]);
 }
 
-}
 
 private function saveFabricDataBack2(
     array $data,
