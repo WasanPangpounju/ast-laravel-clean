@@ -66,3 +66,6 @@ Route::resource('fabricoutdeposit', FabricoutDepositController::class );
 
 Route::post('generate-pdf', 'PDFController@generatePDF')->name('generate-pdf');
 
+Route::get('/healthz', function () {
+    return 'OK';
+});
