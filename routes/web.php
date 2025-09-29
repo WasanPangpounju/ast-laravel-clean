@@ -38,8 +38,10 @@ Route::get('/', function () {
 
 Auth::routes();
 
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
-
+// Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+Route::get('/home', function () {
+    return redirect()->route('stockfabric.index'); // หรือ return response('HOME OK', 200);
+})->name('home');
 Route::resource('employee', EmployeeController::class );
 
 Route::resource('customer', CustomerController::class );
