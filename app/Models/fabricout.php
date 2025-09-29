@@ -29,6 +29,10 @@ class fabricout extends Model
             'receiveType',
             'orderId',
             'purchaseOrder',
+                'stockCustomer',
+                'stockFabricStruct',
+                'stockFabricPattern',
+                'stockFabricW',
     ];
 
 }

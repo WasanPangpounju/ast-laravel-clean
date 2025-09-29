@@ -302,6 +302,349 @@ class FabricoutController extends Controller
                         ->where('id', $order_id)->get();
         $order_sendW = FabricAst::select('fabric_w')->where('purchaseOrder', $order_id)->get();
 
+        session()->put('customerName',  $order_send[0]->customerName   ?? '');
+        session()->put('fabricStruct',  $order_send[0]->fabricStructure ?? '');
+        session()->put('fabricPattern', $order_send[0]->fabricPattern   ?? '');
+        session()->put('fabricW',       $order_sendW[0]->fabric_w       ?? '');
+
+        $po = AstPurchaseorder::where('id', $order_id)->value('purchaseOrder');
+        session()->put('purchaseOrder', $po ?? '');
+
+        session()->forget('fabricout_group');
+
+        $lastVat = Fabricout::groupBy('vatType')
+            ->select('vatType', Fabricout::raw('MAX(vatNo) as max_no'))->get();
+        $vatA = '1001'; $vatB = '1001'; $vatC = '1001';
+        foreach ($lastVat as $v) {
+            if ($v->vatType === 'A') $vatA = $v->max_no ? $v->max_no + 1 : '1001';
+            if ($v->vatType === 'B') $vatB = $v->max_no ? $v->max_no + 1 : '1001';
+            if ($v->vatType === 'C') $vatC = $v->max_no ? $v->max_no + 1 : '1001';
+        }
+
+        $ecp    = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2','อนุมัติให้ผลิต')->get();
+        $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
+                    ->whereIn('id',$ecp)->orderBy('customerName')->get();
+
+        $customer_name     = session('customerName','');
+        $fabric_struct     = '';
+        $stockFabricStruct = stockfabric::groupBy(['fabricStruct','fabricPattern','fabricW'])
+            ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
+            ->get();
+
+        return view('fabricout.create', compact(
+            'customers','order_id','customer_name','fabric_struct',
+            'orders','stockFabricStruct','vatA','vatB','vatC'
+        ));
+    }
+
+    /* ---------- 3) เตรียมค่า & Snapshot group key ---------- */
+    $fixedDate = str_replace('/', '-', $request->input('dt') ?: date('Y-m-d'));
+    $date      = date('Y-m-d', strtotime($fixedDate));
+
+    $val = fn(string $key) => $request->filled($key) ? trim((string)$request->input($key)) : session($key);
+
+    if (!session()->has('fabricout_group')) {
+        $snapshot = [
+            'vatNo'         => $val('vatNo'),
+            'vatType'       => $val('vatType'),
+            'fabricStruct'  => $val('fabricStruct'),
+            'fabricPattern' => $val('fabricPattern'),
+            'fabricW'       => $val('fabricW'),
+            'customerName'  => $val('customerName'),
+            'receiveName'   => $val('receiveName'),
+            'no'            => session('no'),
+            'orderId'       => session('orderId'),
+            'purchaseOrder' => session('purchaseOrder') ?? $val('purchaseOrder'),
+        ];
+        // ✅ เพิ่มกุญแจตัดสต็อก โดย "รวม" เข้ากับ snapshot เดิม (ไม่ทับค่าเดิม)
+        $snapshot = array_merge($snapshot, [
+            'stockCustomer'      => $val('stockCustomer')      ?: ($val('customerName') ?: 'AST'),
+            'stockFabricStruct'  => $val('stockFabricStruct')  ?: $val('fabricStruct'),
+            'stockFabricPattern' => $val('stockFabricPattern') ?: $val('fabricPattern'),
+            'stockFabricW'       => $val('stockFabricW')       ?: $val('fabricW'),
+        ]);
+
+        session()->put('fabricout_group', $snapshot);
+    }
+    $G = session('fabricout_group');
+
+    $comment             = $val('comment');
+    $receiveType         = $val('receiveType');
+    $orderId             = $G['orderId']       ?? $val('orderId');
+    $purchaseOrder       = $G['purchaseOrder'] ?? $val('purchaseOrder');
+    $customerReplace     = $val('customerReplace');
+    $fabricStructReplace = $val('fabricStructReplace');
+
+    // ข้อมูลพับรอบนี้
+    $arr_data = [];
+    foreach ($request->input('sumYard', []) as $v) {
+        if ($v !== '' && $v !== null) $arr_data[] = $v;
+    }
+
+    // ฟังก์ชันบันทึก 1 ก้อน
+    $saveChunk = function(array $arr) use ($G, $date, $comment, $receiveType, $orderId, $purchaseOrder, $customerReplace, $fabricStructReplace) {
+        if (empty($arr)) return;
+
+        $oldEnd    = session('endCount') ?? 0;
+        $startFold = ($oldEnd > 0) ? ($oldEnd + 1) : 1;
+
+        // คง/สร้าง refId
+        if (session()->has('refId')) {
+            $refId = session('refId');
+        } else {
+            $refId = str_replace('/', '', base64_encode(random_bytes(32)));
+            session()->put('refId', $refId);
+        }
+
+        // ✅ คีย์ตัดสต็อกจาก snapshot (มีค่า fallback)
+        $stockCustomer      = $G['stockCustomer']      ?? 'AST';
+        $stockFabricStruct  = $G['stockFabricStruct']  ?? $G['fabricStruct'];
+        $stockFabricPattern = $G['stockFabricPattern'] ?? $G['fabricPattern'];
+        $stockFabricW       = $G['stockFabricW']       ?? $G['fabricW'];
+
+        DB::transaction(function() use ($arr, $refId, $G, $date, $comment, $receiveType, $orderId, $purchaseOrder, $customerReplace, $fabricStructReplace, $startFold, $stockCustomer, $stockFabricStruct, $stockFabricPattern, $stockFabricW) {
+            $this->saveFabricData(
+                $arr,
+                $refId,
+                auth()->user()->name,
+                $G['fabricStruct'],
+                $G['fabricPattern'],
+                $G['fabricW'],
+                $customerReplace,
+                $fabricStructReplace,
+                $G['vatNo'],
+                $G['vatType'],
+                $startFold,
+                $date,
+                $G['no'],
+                $G['customerName'],
+                $G['receiveName'],
+                $comment,
+                $receiveType,
+                $orderId,
+                $purchaseOrder,
+                // 🔐 ส่งกุญแจตัดสต็อก 4 ตัว
+                $stockCustomer, $stockFabricStruct, $stockFabricPattern, $stockFabricW
+            );
+        });
+
+        session()->put('endCount', $oldEnd + count($arr));
+    };
+
+    /* ---------- 4) nextData ---------- */
+    if ($request->filled('submit') && $request->submit === 'nextData') {
+        if (!empty($arr_data)) {
+            $total = (float)(session('sum') ?? 0) + array_sum(array_map('floatval', $arr_data));
+            session()->put('sum', $total);
+        }
+
+        $saveChunk($arr_data);
+
+        session()->put([
+            'dt'                  => $date,
+            'comment'             => $comment,
+            'receiveType'         => $receiveType,
+            'customerReplace'     => $customerReplace,
+            'fabricStructReplace' => $fabricStructReplace,
+        ]);
+
+        return $this->create();
+    }
+
+    /* ---------- 5) endData ---------- */
+    if ($request->filled('submit') && $request->submit === 'endData') {
+        $saveChunk($arr_data);
+
+        session()->forget([
+            'refId','endCount','dt','fabricStruct','fabricPattern','fabricW',
+            'customerReplace','fabricStructReplace','no','orderId','sum',
+            'customerName','receiveName','comment','receiveType','vatNo','vatType',
+            'purchaseOrder','fabricout_group'
+        ]);
+
+        return redirect('/fabricout');
+    }
+
+    /* ---------- 6) submitfabricout ---------- */
+    if ($request->filled('submit') && $request->submit === 'submitfabricout') {
+        // … (โค้ดพิมพ์ PDF เดิมของคุณ)
+    }
+
+    return back()->with('error','คำสั่งไม่ถูกต้อง');
+}
+
+private function saveFabricDataBack2(
+    array $data,
+    string $refId,
+    string $emp,
+    ?string $fabricStruct,
+    ?string $fabricPattern,
+    ?string $fabricW,
+    ?string $customerReplace,
+    ?string $fabricStructReplace,
+    ?string $vatNo,
+    ?string $vatType,
+    int $start,
+    string $createDate,
+    $no,
+    ?string $customerName,
+    ?string $receiveName,
+    ?string $comment,
+    ?string $receiveType,
+    $orderId = null,
+    $purchaseOrder = null,
+    // ✅ พารามิเตอร์ใหม่ (optional เพื่อให้โค้ดเก่าทำงานต่อได้)
+    ?string $stockCustomer = null,
+    ?string $stockFabricStruct = null,
+    ?string $stockFabricPattern = null,
+    ?string $stockFabricW = null
+) {
+    $c = $start;
+    foreach ($data as $yd) {
+        Fabricout::create([
+            'refId'         => $refId,
+            'emp'           => $emp,
+
+            // อ้างอิงออร์เดอร์
+            'orderId'       => $orderId,
+            'purchaseOrder' => $purchaseOrder,
+
+            // 🔐 กุญแจตัดสต็อก (ใช้ fallback ถ้าไม่ได้ส่งมา)
+            'stockCustomer'      => $stockCustomer      ?: ($customerName ?: 'AST'),
+            'stockFabricStruct'  => $stockFabricStruct  ?: $fabricStruct,
+            'stockFabricPattern' => $stockFabricPattern ?: $fabricPattern,
+            'stockFabricW'       => $stockFabricW       ?: $fabricW,
+
+            // ข้อมูลใช้งาน/แสดงผล
+            'no'                  => $no,
+            'customerName'        => $customerName,
+            'receiveName'         => $receiveName,
+            'receiveType'         => $receiveType,
+            'comment'             => $comment,
+            'fabricStruct'        => $fabricStruct,
+            'fabricPattern'       => $fabricPattern,
+            'fabricW'             => $fabricW,
+            'customerReplace'     => $customerReplace,
+            'fabricStructReplace' => $fabricStructReplace,
+            'vatNo'               => $vatNo,
+            'vatType'             => $vatType,
+
+            'fold'       => $c,
+            'sumYard'    => $yd,
+            'createDate' => $createDate,
+        ]);
+        $c++;
+    }
+}
+
+private function saveFabricData(
+    array $data,
+    string $refId,
+    string $emp,
+    ?string $fabricStruct,
+    ?string $fabricPattern,
+    ?string $fabricW,
+    ?string $customerReplace,
+    ?string $fabricStructReplace,
+    ?string $vatNo,
+    ?string $vatType,
+    int $start,
+    string $createDate,
+    $no,
+    ?string $customerName,
+    ?string $receiveName,
+    ?string $comment,
+    ?string $receiveType,
+    $orderId = null,
+    $purchaseOrder = null,
+    // ✅ พารามิเตอร์ใหม่ (optional เพื่อให้โค้ดเก่าทำงานต่อได้)
+    ?string $stockCustomer = null,
+    ?string $stockFabricStruct = null,
+    ?string $stockFabricPattern = null,
+    ?string $stockFabricW = null
+) {
+    $c = $start;
+    foreach ($data as $yd) {
+        Fabricout::create([
+            'refId'         => $refId,
+            'emp'           => $emp,
+
+            // อ้างอิงออร์เดอร์
+            'orderId'       => $orderId,
+            'purchaseOrder' => $purchaseOrder,
+
+            // 🔐 กุญแจตัดสต็อก (ใช้ fallback ถ้าไม่ได้ส่งมา)
+            'stockCustomer'      => $stockCustomer      ?: ($customerName ?: 'AST'),
+            'stockFabricStruct'  => $stockFabricStruct  ?: $fabricStruct,
+            'stockFabricPattern' => $stockFabricPattern ?: $fabricPattern,
+            'stockFabricW'       => $stockFabricW       ?: $fabricW,
+
+            // ข้อมูลใช้งาน/แสดงผล
+            'no'                  => $no,
+            'customerName'        => $customerName,
+            'receiveName'         => $receiveName,
+            'receiveType'         => $receiveType,
+            'comment'             => $comment,
+            'fabricStruct'        => $fabricStruct,
+            'fabricPattern'       => $fabricPattern,
+            'fabricW'             => $fabricW,
+            'customerReplace'     => $customerReplace,
+            'fabricStructReplace' => $fabricStructReplace,
+            'vatNo'               => $vatNo,
+            'vatType'             => $vatType,
+
+            'fold'       => $c,
+            'sumYard'    => $yd,
+            'createDate' => $createDate,
+        ]);
+        $c++;
+    }
+}
+
+// ==========
+
+    public function storeback1(Request $request)
+{
+    /* ---------- 1) ค้นหา ---------- */
+    if ($request->filled('submit') && $request->submit === 'searchImport') {
+        $select_search = 'findNo';
+        $searchInput   = $request->findNo ?? $request->Notype ?? '';
+
+        if (empty($request->findNo) && $request->filled('Notype')) {
+            $importFabricout = Fabricout::where('vatType','LIKE','%'.$request->Notype.'%')
+                ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
+                ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
+                ->orderBy('lastDate','DESC')->get();
+        } elseif ($request->filled('findNo') && $request->Notype === 'non') {
+            $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
+                ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
+                ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
+                ->orderBy('lastDate','DESC')->get();
+        } else {
+            $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
+                ->where('vatType','LIKE','%'.$request->Notype.'%')
+                ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
+                ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
+                ->orderBy('lastDate','DESC')->get();
+        }
+        return view('fabricout.index', compact('importFabricout','select_search','searchInput'));
+    }
+
+    /* ---------- 2) generateByOrder ---------- */
+    if ($request->filled('submit') && $request->submit === 'generateByOrder') {
+        $customers  = Customer::orderBy('name')->get();
+
+        $lastRecord = Fabricout::latest()->first();
+        $no         = $lastRecord ? ($lastRecord->no + 1) : 1001;
+        if (!session()->has('no')) session()->put('no', $no);
+
+        $order_id = $request->input('orderId');
+        session()->put('orderId', $order_id);
+
+        $order_send  = AstPurchaseorder::select('customerName','fabricId','fabricStructure','fabricPattern')
+                        ->where('id', $order_id)->get();
+        $order_sendW = FabricAst::select('fabric_w')->where('purchaseOrder', $order_id)->get();
+
         // เก็บค่าพื้นฐานลง session เพื่อโชว์ในฟอร์ม
         session()->put('customerName',  $order_send[0]->customerName  ?? '');
         session()->put('fabricStruct',  $order_send[0]->fabricStructure ?? '');
@@ -362,6 +705,15 @@ class FabricoutController extends Controller
             'orderId'       => session('orderId'),
             'purchaseOrder' => session('purchaseOrder') ?? $val('purchaseOrder'),
         ];
+
+        $snapshot = [
+  // ...คีย์เดิมของคุณ
+  'stockCustomer'      => $val('stockCustomer')      ?: ($val('customerName') ?: 'AST'),
+  'stockFabricStruct'  => $val('stockFabricStruct')  ?: $val('fabricStruct'),
+  'stockFabricPattern' => $val('stockFabricPattern') ?: $val('fabricPattern'),
+  'stockFabricW'       => $val('stockFabricW')       ?: $val('fabricW'),
+];
+// session()->put('fabricout_group', $snapshot);
         session()->put('fabricout_group', $snapshot);
     }
     $G = session('fabricout_group');
@@ -466,7 +818,7 @@ class FabricoutController extends Controller
     return back()->with('error','คำสั่งไม่ถูกต้อง');
 }
 
-private function saveFabricData(
+private function saveFabricDataBack1(
     array $data,
     string $refId,
     string $emp,
