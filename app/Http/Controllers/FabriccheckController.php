@@ -73,75 +73,157 @@ class FabriccheckController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-
 public function store(Request $request)
 {
-        @set_time_limit(0);                    // ยกเลิก time limit ของ PHP
-    @ini_set('max_execution_time', '0');   // สำรอง เผื่อ set_time_limit ไม่ได้
+    // กัน timeout ชั่วคราว (แต่ควรแก้ที่คิวรี/ดัชนีเป็นหลัก)
+    @set_time_limit(0);
+    @ini_set('max_execution_time', '0');
 
     if (!($request->filled('submit') && $request->submit === 'searchImport')) {
         return redirect()->route('fabriccheck.index');
     }
 
-    // ค่าที่ปุ่ม "ตรวจสอบ" ส่งมา (เอาค่าดิบจาก DB ให้เป๊ะที่สุด)
+    // รับค่าจากปุ่ม "ตรวจสอบ" (ส่งมาจากหน้าสต็อก)
     $customer      = (string) $request->input('customer', '');
-    $fabricId      = (string) $request->input('fabricId', '');
+    $fabricId      = (string) $request->input('fabricId', '');      // ← แนะนำให้ส่งมาด้วย
     $fabricStruct  = (string) $request->input('fabricStruct', '');
     $fabricPattern = (string) $request->input('fabricPattern', '');
     $fabricW       = (string) $request->input('fabricW', '');
 
-    // ถ้าไม่มีเงื่อนไขเลย ไม่อนุญาตให้สแกนทั้งตาราง
+    // หากไม่มีเงื่อนไขเลย ไม่ให้สแกนทั้งตาราง
     if ($customer === '' && $fabricId === '' && $fabricStruct === '' && $fabricPattern === '' && $fabricW === '') {
-        return redirect()->route('fabriccheck.index')->with('warn', 'กรุณาเลือกเงื่อนไขอย่างน้อย 1 อย่าง');
+        return redirect()
+            ->route('fabriccheck.index')
+            ->with('warn', 'กรุณาเลือกเงื่อนไขอย่างน้อย 1 อย่าง');
     }
 
-    // ชั้นแรก: where ด้วยคอลัมน์ตรง ๆ (ไม่ใช้ TRIM/LOWER/LIKE %...%) เพื่อให้ใช้ index
-    $pre = DB::table('stockfabrics as s');
+    /**
+     * ฟังก์ชันช่วย: สร้างคิวรีแบบ "ตรงคอลัมน์" (ใช้ index ได้)
+     * แล้ว wrap เป็นซับคิวรีเพื่อ group/aggregate โดยอิง alias (เลี่ยง ONLY_FULL_GROUP_BY)
+     */
+    $buildExactAgg = function() use ($customer,$fabricId,$fabricStruct,$fabricPattern,$fabricW) {
+        $pre = DB::table('stockfabrics as s');
 
-    if ($customer !== '') {
-        if (strtoupper($customer) === 'AST') {
-            // กรณี AST: ถือว่าเป็น (NULL / ว่าง / 'AST')
-            $pre->where(function ($q) {
-                $q->whereNull('s.customer')->orWhere('s.customer', '')
-                  ->orWhere('s.customer', 'AST');
-            });
-        } else {
-            $pre->where('s.customer', $customer);
+        // กรณีลูกค้าว่าง = ใช้ AST: ตรงคอลัมน์เพื่อให้ index ทำงาน
+        if ($customer !== '') {
+            if (strtoupper($customer) === 'AST') {
+                $pre->where(function ($q) {
+                    $q->whereNull('s.customer')
+                      ->orWhere('s.customer', '')
+                      ->orWhere('s.customer', 'AST');
+                });
+            } else {
+                $pre->where('s.customer', $customer);
+            }
         }
+        if ($fabricId      !== '') $pre->where('s.fabricId', $fabricId);
+        if ($fabricStruct  !== '') $pre->where('s.fabricStruct', $fabricStruct);
+        if ($fabricPattern !== '') $pre->where('s.fabricPattern', $fabricPattern);
+        if ($fabricW       !== '') $pre->where('s.fabricW', $fabricW);
+
+        // เลือกคอลัมน์พร้อม normalize เบา ๆ ในชั้นซับคิวรีเท่านั้น
+        $base = $pre->selectRaw("
+            COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') AS customer,
+            s.fabricId                                    AS fabricId,
+            TRIM(s.fabricStruct)                          AS fabricStruct,
+            TRIM(s.fabricPattern)                         AS fabricPattern,
+            TRIM(s.fabricW)                               AS fabricW,
+            s.createDate                                  AS createDate,
+            s.sumYard                                     AS sumYard,
+            s.refId                                       AS refId
+        ");
+
+        return DB::query()->fromSub($base, 't')
+            ->selectRaw("
+                customer, fabricId, fabricStruct, fabricPattern, fabricW,
+                MAX(createDate) AS lastCreateDate,
+                COUNT(*)        AS foldCount,
+                SUM(sumYard)    AS sumYardSum,
+                MIN(refId)      AS refId
+            ")
+            ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW')
+            ->orderByDesc('lastCreateDate')
+            ->limit(500); // กันผลลัพธ์ล้น
+    };
+
+    /**
+     * คิวรีรอบแรก: ตรงคอลัมน์ (เร็วสุด)
+     */
+    $importorder = $buildExactAgg()->get();
+
+    /**
+     * ถ้าไม่เจอผลลัพธ์เลย → fallback แบบ normalize เพื่อกันเคส space/ตัวคูณ x/× ฯลฯ
+     * (ทำเฉพาะเมื่อจำเป็น เพื่อลดโอกาสช้า/timeout)
+     */
+    if ($importorder->isEmpty()) {
+
+        $norm = function ($col) {
+            // normalize: trim, lower, ตัดช่องว่าง, แทน '×' เป็น 'x'
+            // หมายเหตุ: ใช้เฉพาะใน fallback เท่านั้น
+            return DB::raw("REPLACE(REPLACE(LOWER(TRIM($col)), ' ', ''), '×', 'x')");
+        };
+
+        $pre = DB::table('stockfabrics as s');
+
+        if ($customer !== '') {
+            if (strtoupper($customer) === 'AST') {
+                $pre->where(function ($q) {
+                    $q->whereNull('s.customer')
+                      ->orWhere('s.customer', '')
+                      ->orWhere('s.customer', 'AST');
+                });
+            } else {
+                // ตรงคอลัมน์ (customer ไม่ค่อยมีปัญหาเรื่อง normalize)
+                $pre->where('s.customer', $customer);
+            }
+        }
+
+        if ($fabricId !== '') {
+            $pre->where('s.fabricId', $fabricId);
+        }
+
+        if ($fabricStruct !== '') {
+            // normalize เฉพาะฝั่งที่รับเข้ามา
+            $needle = mb_strtolower(trim(str_replace([' ', '×'], ['', 'x'], $fabricStruct)));
+            $pre->where($norm('s.fabricStruct'), '=', $needle);
+        }
+        if ($fabricPattern !== '') {
+            $needle = mb_strtolower(trim(str_replace([' ', '×'], ['', 'x'], $fabricPattern)));
+            $pre->where($norm('s.fabricPattern'), '=', $needle);
+        }
+        if ($fabricW !== '') {
+            $needle = mb_strtolower(trim(str_replace(' ', '', $fabricW)));
+            $pre->where($norm('s.fabricW'), '=', $needle);
+        }
+
+        $base = $pre->selectRaw("
+            COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') AS customer,
+            s.fabricId                                    AS fabricId,
+            TRIM(s.fabricStruct)                          AS fabricStruct,
+            TRIM(s.fabricPattern)                         AS fabricPattern,
+            TRIM(s.fabricW)                               AS fabricW,
+            s.createDate                                  AS createDate,
+            s.sumYard                                     AS sumYard,
+            s.refId                                       AS refId
+        ");
+
+        $importorder = DB::query()->fromSub($base, 't')
+            ->selectRaw("
+                customer, fabricId, fabricStruct, fabricPattern, fabricW,
+                MAX(createDate) AS lastCreateDate,
+                COUNT(*)        AS foldCount,
+                SUM(sumYard)    AS sumYardSum,
+                MIN(refId)      AS refId
+            ")
+            ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW')
+            ->orderByDesc('lastCreateDate')
+            ->limit(500)
+            ->get();
     }
-    if ($fabricId !== '')      $pre->where('s.fabricId', $fabricId);
-    if ($fabricStruct !== '')  $pre->where('s.fabricStruct', $fabricStruct);
-    if ($fabricPattern !== '') $pre->where('s.fabricPattern', $fabricPattern);
-    if ($fabricW !== '')       $pre->where('s.fabricW', $fabricW);
 
-    // โปรเจ็กต์คอลัมน์แบบ normalize ในชั้นซับคิวรี (GROUP BY จะอ้าง alias ที่ได้)
-    $base = $pre->selectRaw("
-        COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') AS customer,
-        s.fabricId                                    AS fabricId,
-        TRIM(s.fabricStruct)                          AS fabricStruct,
-        TRIM(s.fabricPattern)                         AS fabricPattern,
-        TRIM(s.fabricW)                               AS fabricW,
-        s.createDate                                  AS createDate,
-        s.sumYard                                     AS sumYard,
-        s.refId                                       AS refId
-    ");
-
-    $importorder = DB::query()->fromSub($base, 't')
-        ->selectRaw("
-            customer, fabricId, fabricStruct, fabricPattern, fabricW,
-            MAX(createDate) AS lastCreateDate,
-            COUNT(*)        AS foldCount,
-            SUM(sumYard)    AS sumYardSum,
-            MIN(refId)      AS refId
-        ")
-        ->groupBy('customer','fabricId','fabricStruct','fabricPattern','fabricW')
-        ->orderByDesc('lastCreateDate')
-        ->limit(200)   // กันคิวรี/ผลลัพธ์ล้น
-        ->get();
-
-    // สำคัญ: ไม่สร้างคิวรีใหญ่ทั้งตารางในรอบค้นหา
-    $allfabricout      = collect(); // ว่าง
-    $stockFabricStruct = collect(); // ว่าง
+    // ไม่ต้องดึงรายการใหญ่ ๆ อื่นเพื่อเซฟเวลา
+    $allfabricout      = collect();
+    $stockFabricStruct = collect();
 
     return view('fabricoutcheck.index', compact('importorder', 'stockFabricStruct', 'allfabricout'));
 }
