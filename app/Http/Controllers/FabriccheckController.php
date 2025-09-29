@@ -73,7 +73,6 @@ class FabriccheckController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-use Illuminate\Support\Facades\DB;
 
 public function store(Request $request)
 {
