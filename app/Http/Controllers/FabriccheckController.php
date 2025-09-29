@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers;
+stnamespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -75,87 +75,114 @@ class FabriccheckController extends Controller
      */
 public function store(Request $request)
 {
-    if (!($request->filled('submit') && $request->submit === 'searchImport')) {
-        return back();
+    if ($request->input('submit') !== 'searchImport') {
+        return redirect()->route('fabriccheck.index');
     }
 
-    // -------- อ่านพารามิเตอร์กรอง --------
-    $customer      = trim((string)$request->input('customer', ''));
-    $fabricStruct  = trim((string)$request->input('fabricStruct', ''));
-    $fabricPattern = trim((string)$request->input('fabricPattern', ''));
-    $fabricW       = trim((string)$request->input('fabricW', ''));
-    $fabricId      = trim((string)$request->input('fabricId', ''));
-    $imDate        = trim((string)$request->input('imDate', '')); // dd/mm/yyyy
+    // รับค่าค้นหา
+    $customer      = trim((string) $request->input('customer', ''));
+    $fabricStruct  = trim((string) $request->input('fabricStruct', ''));
+    $fabricPattern = trim((string) $request->input('fabricPattern', ''));
+    $fabricW       = trim((string) $request->input('fabricW', ''));
+    $fabricId      = trim((string) $request->input('fabricId', ''));
+    $imDate        = trim((string) $request->input('imDate', ''));
 
-    // ต้องมีอย่างน้อย 1 เงื่อนไข ป้องกันสแกนทั้งตาราง
-    if ($customer === '' && $fabricStruct === '' && $fabricPattern === '' && $fabricW === '' && $fabricId === '' && $imDate === '') {
-        return back()->with('error', 'กรุณาระบุเงื่อนไขอย่างน้อย 1 รายการก่อน “ตรวจสอบ”');
+    // ฟังก์ชัน normalize โครงสร้างผ้า: ตัด undefined/เว้นวรรค แปลง * หรือ × เป็น x และ lower case
+    $normInput = function ($s) {
+        $s = (string) $s;
+        $s = str_ireplace('undefined', '', $s);
+        $s = str_replace(['×', '*'], 'x', $s);
+        $s = mb_strtolower($s);
+        return preg_replace('/\s+/', '', $s); // ตัดช่องว่างทั้งหมด
+    };
+
+    // query หลัก: สรุปข้อมูลเข้าสต็อก
+    $q = \DB::table('stockfabrics')
+        ->selectRaw("
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+            fabricId,
+            TRIM(fabricStruct)  AS fabricStruct,
+            TRIM(fabricPattern) AS fabricPattern,
+            TRIM(fabricW)       AS fabricW,
+            MAX(createDate)     AS lastCreateDate,
+            COUNT(*)            AS foldCount,
+            SUM(sumYard)        AS sumYardSum,
+            MIN(refId)          AS refId
+        ");
+
+    // เงื่อนไข (ใส่เฉพาะที่กรอก)
+    if ($customer !== '') {
+        // เทียบกับค่า fallback 'AST' ด้วย
+        $q->whereRaw("COALESCE(NULLIF(TRIM(customer), ''), 'AST') LIKE ?", ['%'.$customer.'%']);
     }
 
-    // -------- จำกัดช่วงเวลา (เร่งความเร็ว) --------
-    $dateStart = null;
-    $dateEnd   = null;
+    if ($fabricId !== '') {
+        $q->where('fabricId', 'like', '%'.$fabricId.'%');
+    }
+
+    if ($fabricPattern !== '') {
+        $q->where('fabricPattern', 'like', '%'.$fabricPattern.'%');
+    }
+
+    if ($fabricW !== '') {
+        $q->where('fabricW', 'like', '%'.$fabricW.'%');
+    }
+
+    if ($fabricStruct !== '') {
+        // ทำ like โดย normalize ฝั่ง DB เช่นกัน: ตัด undefined/ช่องว่าง แปลง */× เป็น x แล้ว lower
+        $needle = $normInput($fabricStruct);
+        $q->whereRaw("
+            REPLACE(
+                REPLACE(
+                    REPLACE(LOWER(TRIM(fabricStruct)), 'undefined', ''),
+                ' ', ''),
+            '×', 'x') LIKE ?
+        ", ['%'.$needle.'%']);
+    }
+
     if ($imDate !== '') {
+        // ถ้า createDate เป็น DATE: whereDate เท่ากับวันนั้น
         $d = \DateTime::createFromFormat('d/m/Y', $imDate);
         if ($d) {
-            $dateStart = $d->format('Y-m-d');
-            $dateEnd   = $dateStart;
+            $q->whereDate('createDate', '=', $d->format('Y-m-d'));
         }
-    } else {
-        // ถ้าไม่ระบุวันที่ ให้ดูย้อนหลัง 120 วันเพื่อตัดสแกนทั้งตาราง
-        $dateStart = now()->subDays(120)->format('Y-m-d');
     }
 
-    // -------- คิวรีหลัก: กรองก่อน แล้วค่อย group by --------
-    // ใช้ prefix match (term%) ให้ใช้ index ได้ดีกว่า %term%
-    $perPage = 60;
+    // GROUP BY ต้องใช้ expression จริง ไม่ใช่ alias เพื่อให้ผ่าน ONLY_FULL_GROUP_BY
+    $q->groupBy(
+        \DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"),
+        'fabricId',
+        \DB::raw('TRIM(fabricStruct)'),
+        \DB::raw('TRIM(fabricPattern)'),
+        \DB::raw('TRIM(fabricW)')
+    );
 
-    $q = \App\Models\stockfabric::query()
-        ->when($customer      !== '', fn($q) => $q->where('customer',      'like', $customer.'%'))
-        ->when($fabricStruct  !== '', fn($q) => $q->where('fabricStruct',  'like', $fabricStruct.'%'))
-        ->when($fabricPattern !== '', fn($q) => $q->where('fabricPattern', 'like', $fabricPattern.'%'))
-        ->when($fabricW       !== '', fn($q) => $q->where('fabricW',       'like', $fabricW.'%'))
-        ->when($fabricId      !== '', fn($q) => $q->where('fabricId',      'like', $fabricId.'%'))
-        ->when($dateStart,          fn($q) => $q->whereDate('createDate', '>=', $dateStart))
-        ->when($dateEnd,            fn($q) => $q->whereDate('createDate', '<=', $dateEnd))
-        ->groupBy('fabricId','refId','fabricStruct','fabricPattern','fabricW','customer')
-        ->selectRaw("
-            fabricId,
-            customer,
-            refId,
-            fabricStruct,
-            MAX(createDate)   AS lastCreateDate,
-            fabricPattern,
-            fabricW,
-            COUNT(*)          AS foldCount,
-            SUM(sumYard)      AS sumYardSum
-        ")
-        ->orderByDesc('lastCreateDate');
+    // เรียงล่าสุด และแบ่งหน้า
+    $importorder = $q->orderByDesc('lastCreateDate')
+                     ->paginate(50)
+                     ->appends($request->except('page'));
 
-    // แบ่งหน้าเพื่อลด memory/render time
-    $importorder = $q->paginate($perPage)->appends($request->except('page'));
-
-    // ใช้ชุดเดียวกัน ไม่ต้องยิงคิวรีซ้ำ
-    $allfabricout = $importorder;
-
-    // -------- ชุด suggestion โครงสร้างผ้า (จำกัดจำนวน) --------
-    $stockFabricStruct = \App\Models\stockfabric::query()
-        ->when($fabricStruct !== '', fn($q) => $q->where('fabricStruct', 'like', $fabricStruct.'%'))
-        ->groupBy('fabricStruct','fabricPattern','fabricW')
-        ->selectRaw("
-            fabricStruct,
-            fabricPattern,
-            fabricW,
-            COUNT(*)       AS foldCount,
-            SUM(sumYard)   AS sumYardSum,
-            MAX(createDate) AS lastDate
-        ")
-        ->orderByDesc('lastDate')
-        ->limit(50)
+    // รายการสำหรับ typeahead โครงสร้าง (ส่งให้ view เสมอ)
+    $stockFabricStruct = \DB::table('stockfabrics')
+        ->selectRaw('TRIM(fabricStruct) AS fabricStruct, TRIM(fabricPattern) AS fabricPattern, TRIM(fabricW) AS fabricW')
+        ->groupBy(\DB::raw('TRIM(fabricStruct)'), \DB::raw('TRIM(fabricPattern)'), \DB::raw('TRIM(fabricW)'))
+        ->orderBy(\DB::raw('TRIM(fabricStruct)'))
+        ->limit(1000)
         ->get();
 
-    return view('fabricoutcheck.index', compact('importorder','allfabricout','stockFabricStruct'));
+    // เคส: ถ้าไม่กรอกอะไรเลย ให้ถือว่าเป็นการ “ดูทั้งหมด”
+    $noFilters =
+        $customer === '' && $fabricStruct === '' && $fabricPattern === '' &&
+        $fabricW === '' && $fabricId === '' && $imDate === '';
+
+    if ($noFilters && $importorder->total() === 0) {
+        // ปกติไม่น่าจะเกิด แต่กันไว้
+        return redirect()->route('fabriccheck.index')->with('error', 'ไม่มีข้อมูลในระบบ');
+    }
+
+    return view('fabricoutcheck.index', compact('importorder', 'stockFabricStruct'));
 }
+
     
     public function store_back(Request $request)
     {
