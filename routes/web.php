@@ -66,6 +66,3 @@ Route::resource('fabricoutdeposit', FabricoutDepositController::class );
 
 Route::post('generate-pdf', 'PDFController@generatePDF')->name('generate-pdf');
 
-Route::get('/', function () {
-    return view('welcome'); // ไฟล์นี้ต้องมีจริง
-});
