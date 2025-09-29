@@ -76,6 +76,9 @@ class FabriccheckController extends Controller
 
 public function store(Request $request)
 {
+        @set_time_limit(0);                    // ยกเลิก time limit ของ PHP
+    @ini_set('max_execution_time', '0');   // สำรอง เผื่อ set_time_limit ไม่ได้
+
     if (!($request->filled('submit') && $request->submit === 'searchImport')) {
         return redirect()->route('fabriccheck.index');
     }
