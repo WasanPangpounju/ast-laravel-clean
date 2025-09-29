@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
 use App\Models\fabricout;
@@ -78,74 +79,83 @@ public function store(Request $request)
         return back();
     }
 
-    // ---- รับและทำความสะอาดพารามิเตอร์กรอง ----
-    $customer      = trim((string) $request->get('customer', ''));
-    $fabricStruct  = trim((string) $request->get('fabricStruct', ''));
-    $fabricPattern = trim((string) $request->get('fabricPattern', ''));
-    $fabricW       = trim((string) $request->get('fabricW', ''));
-    $fabricId      = trim((string) $request->get('fabricId', ''));
-    $imDate        = trim((string) $request->get('imDate', '')); // dd/mm/yyyy
+    // -------- อ่านพารามิเตอร์กรอง --------
+    $customer      = trim((string)$request->input('customer', ''));
+    $fabricStruct  = trim((string)$request->input('fabricStruct', ''));
+    $fabricPattern = trim((string)$request->input('fabricPattern', ''));
+    $fabricW       = trim((string)$request->input('fabricW', ''));
+    $fabricId      = trim((string)$request->input('fabricId', ''));
+    $imDate        = trim((string)$request->input('imDate', '')); // dd/mm/yyyy
 
-    // ต้องมีอย่างน้อย 1 เงื่อนไขป้องกันสแกนทั้งตาราง
+    // ต้องมีอย่างน้อย 1 เงื่อนไข ป้องกันสแกนทั้งตาราง
     if ($customer === '' && $fabricStruct === '' && $fabricPattern === '' && $fabricW === '' && $fabricId === '' && $imDate === '') {
         return back()->with('error', 'กรุณาระบุเงื่อนไขอย่างน้อย 1 รายการก่อน “ตรวจสอบ”');
     }
 
-    // แปลงวันที่ dd/mm/yyyy -> Y-m-d (ถ้าส่งมา)
-    $dateYmd = null;
+    // -------- จำกัดช่วงเวลา (เร่งความเร็ว) --------
+    $dateStart = null;
+    $dateEnd   = null;
     if ($imDate !== '') {
         $d = \DateTime::createFromFormat('d/m/Y', $imDate);
         if ($d) {
-            $dateYmd = $d->format('Y-m-d');
+            $dateStart = $d->format('Y-m-d');
+            $dateEnd   = $dateStart;
         }
+    } else {
+        // ถ้าไม่ระบุวันที่ ให้ดูย้อนหลัง 120 วันเพื่อตัดสแกนทั้งตาราง
+        $dateStart = now()->subDays(120)->format('Y-m-d');
     }
 
-    // ---- คิวรีหลัก: กรองก่อน แล้วค่อย group by (เร็วขึ้นมาก) ----
+    // -------- คิวรีหลัก: กรองก่อน แล้วค่อย group by --------
+    // ใช้ prefix match (term%) ให้ใช้ index ได้ดีกว่า %term%
+    $perPage = 60;
+
     $q = \App\Models\stockfabric::query()
-        ->when($customer      !== '', fn($q) => $q->where('customer',      'like', "%{$customer}%"))
-        ->when($fabricStruct  !== '', fn($q) => $q->where('fabricStruct',  'like', "%{$fabricStruct}%"))
-        ->when($fabricPattern !== '', fn($q) => $q->where('fabricPattern', 'like', "%{$fabricPattern}%"))
-        ->when($fabricW       !== '', fn($q) => $q->where('fabricW',       'like', "%{$fabricW}%"))
-        ->when($fabricId      !== '', fn($q) => $q->where('fabricId',      'like', "%{$fabricId}%"))
-        ->when($dateYmd,            fn($q) => $q->whereDate('createDate', $dateYmd))
-        ->groupBy('fabricId', 'refId', 'fabricStruct', 'fabricPattern', 'fabricW', 'customer')
+        ->when($customer      !== '', fn($q) => $q->where('customer',      'like', $customer.'%'))
+        ->when($fabricStruct  !== '', fn($q) => $q->where('fabricStruct',  'like', $fabricStruct.'%'))
+        ->when($fabricPattern !== '', fn($q) => $q->where('fabricPattern', 'like', $fabricPattern.'%'))
+        ->when($fabricW       !== '', fn($q) => $q->where('fabricW',       'like', $fabricW.'%'))
+        ->when($fabricId      !== '', fn($q) => $q->where('fabricId',      'like', $fabricId.'%'))
+        ->when($dateStart,          fn($q) => $q->whereDate('createDate', '>=', $dateStart))
+        ->when($dateEnd,            fn($q) => $q->whereDate('createDate', '<=', $dateEnd))
+        ->groupBy('fabricId','refId','fabricStruct','fabricPattern','fabricW','customer')
         ->selectRaw("
             fabricId,
             customer,
             refId,
             fabricStruct,
-            MAX(createDate)  as lastCreateDate,
+            MAX(createDate)   AS lastCreateDate,
             fabricPattern,
             fabricW,
-            COUNT(*)         as foldCount,
-            SUM(sumYard)     as sumYardSum
+            COUNT(*)          AS foldCount,
+            SUM(sumYard)      AS sumYardSum
         ")
         ->orderByDesc('lastCreateDate');
 
-    // จำกัดผลลัพธ์กันโหลดหนัก (ปรับได้ตามเหมาะสม)
-    $importorder = $q->limit(500)->get();
+    // แบ่งหน้าเพื่อลด memory/render time
+    $importorder = $q->paginate($perPage)->appends($request->except('page'));
 
-    // ตารางล่างเอาชุดเดียวกัน (ไม่ต้องยิงคิวรีใหญ่ซ้ำ)
+    // ใช้ชุดเดียวกัน ไม่ต้องยิงคิวรีซ้ำ
     $allfabricout = $importorder;
 
-    // ชุด suggest โครงสร้างผ้า — จำกัดจำนวน ลดโหลด
+    // -------- ชุด suggestion โครงสร้างผ้า (จำกัดจำนวน) --------
     $stockFabricStruct = \App\Models\stockfabric::query()
-        ->groupBy('fabricStruct', 'fabricPattern', 'fabricW')
+        ->when($fabricStruct !== '', fn($q) => $q->where('fabricStruct', 'like', $fabricStruct.'%'))
+        ->groupBy('fabricStruct','fabricPattern','fabricW')
         ->selectRaw("
             fabricStruct,
             fabricPattern,
             fabricW,
-            COUNT(*)     as foldCount,
-            SUM(sumYard) as sumYardSum,
-            MAX(createDate) as lastDate
+            COUNT(*)       AS foldCount,
+            SUM(sumYard)   AS sumYardSum,
+            MAX(createDate) AS lastDate
         ")
         ->orderByDesc('lastDate')
-        ->limit(300)
+        ->limit(50)
         ->get();
 
-    return view('fabricoutcheck.index', compact('importorder', 'allfabricout', 'stockFabricStruct'));
+    return view('fabricoutcheck.index', compact('importorder','allfabricout','stockFabricStruct'));
 }
-
     
     public function store_back(Request $request)
     {
