@@ -75,115 +75,89 @@ class FabriccheckController extends Controller
      */
 public function store(Request $request)
 {
-    if ($request->input('submit') !== 'searchImport') {
+    if (!($request->filled('submit') && $request->submit === 'searchImport')) {
         return redirect()->route('fabriccheck.index');
     }
 
-    // รับค่าค้นหา
     $customer      = trim((string) $request->input('customer', ''));
     $fabricStruct  = trim((string) $request->input('fabricStruct', ''));
+    $fabricId      = trim((string) $request->input('fabricId', ''));
     $fabricPattern = trim((string) $request->input('fabricPattern', ''));
     $fabricW       = trim((string) $request->input('fabricW', ''));
-    $fabricId      = trim((string) $request->input('fabricId', ''));
-    $imDate        = trim((string) $request->input('imDate', ''));
 
-    // ฟังก์ชัน normalize โครงสร้างผ้า: ตัด undefined/เว้นวรรค แปลง * หรือ × เป็น x และ lower case
-    $normInput = function ($s) {
-        $s = (string) $s;
-        $s = str_ireplace('undefined', '', $s);
-        $s = str_replace(['×', '*'], 'x', $s);
-        $s = mb_strtolower($s);
-        return preg_replace('/\s+/', '', $s); // ตัดช่องว่างทั้งหมด
-    };
-
-    // query หลัก: สรุปข้อมูลเข้าสต็อก
-    $q = \DB::table('stockfabrics')
+    // สร้าง subquery ที่ normalize คอลัมน์ให้เรียบร้อยก่อน
+    $base = DB::table('stockfabrics as s')
         ->selectRaw("
-            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
-            fabricId,
-            TRIM(fabricStruct)  AS fabricStruct,
-            TRIM(fabricPattern) AS fabricPattern,
-            TRIM(fabricW)       AS fabricW,
-            MAX(createDate)     AS lastCreateDate,
-            COUNT(*)            AS foldCount,
-            SUM(sumYard)        AS sumYardSum,
-            MIN(refId)          AS refId
+            COALESCE(NULLIF(TRIM(s.customer), ''), 'AST')      AS customer_norm,
+            s.fabricId                                         AS fabricId,
+            TRIM(s.fabricStruct)                               AS fabricStruct_norm,
+            TRIM(s.fabricPattern)                              AS fabricPattern_norm,
+            TRIM(s.fabricW)                                    AS fabricW_norm,
+            -- key สำหรับค้นหาโครงสร้างแบบลบ space / 'undefined' / แทน × ด้วย x
+            REPLACE(REPLACE(REPLACE(LOWER(TRIM(s.fabricStruct)), 'undefined', ''), ' ', ''), '×', 'x') AS fabricStruct_key,
+            s.createDate,
+            s.refId,
+            s.sumYard
         ");
 
-    // เงื่อนไข (ใส่เฉพาะที่กรอก)
+    // ใส่เงื่อนไขค้นหา (ใช้ binding ปลอดภัย และไม่ทำให้ quote เพี้ยน)
     if ($customer !== '') {
-        // เทียบกับค่า fallback 'AST' ด้วย
-        $q->whereRaw("COALESCE(NULLIF(TRIM(customer), ''), 'AST') LIKE ?", ['%'.$customer.'%']);
+        $base->whereRaw("COALESCE(NULLIF(TRIM(s.customer), ''), 'AST') LIKE ?", ["%{$customer}%"]);
     }
-
     if ($fabricId !== '') {
-        $q->where('fabricId', 'like', '%'.$fabricId.'%');
+        $base->where('s.fabricId', 'like', "%{$fabricId}%");
     }
-
     if ($fabricPattern !== '') {
-        $q->where('fabricPattern', 'like', '%'.$fabricPattern.'%');
+        $base->where('s.fabricPattern', 'like', "%{$fabricPattern}%");
     }
-
     if ($fabricW !== '') {
-        $q->where('fabricW', 'like', '%'.$fabricW.'%');
+        $base->whereRaw("TRIM(s.fabricW) LIKE ?", ["%{$fabricW}%"]);
     }
-
     if ($fabricStruct !== '') {
-        // ทำ like โดย normalize ฝั่ง DB เช่นกัน: ตัด undefined/ช่องว่าง แปลง */× เป็น x แล้ว lower
-        $needle = $normInput($fabricStruct);
-        $q->whereRaw("
-            REPLACE(
-                REPLACE(
-                    REPLACE(LOWER(TRIM(fabricStruct)), 'undefined', ''),
-                ' ', ''),
-            '×', 'x') LIKE ?
-        ", ['%'.$needle.'%']);
+        // ทำ key ให้ตรง format เดียวกับใน DB (ลบ undefined/ช่องว่าง แปลง × เป็น x และ lower)
+        $fsKey = mb_strtolower($fabricStruct);
+        $fsKey = preg_replace('/undefined/i', '', $fsKey);
+        $fsKey = str_replace('×', 'x', $fsKey);
+        $fsKey = preg_replace('/\s+/u', '', $fsKey);
+
+        $base->whereRaw("
+            REPLACE(REPLACE(REPLACE(LOWER(TRIM(s.fabricStruct)), 'undefined', ''), ' ', ''), '×', 'x') LIKE ?
+        ", ["%{$fsKey}%"]);
     }
 
-    if ($imDate !== '') {
-        // ถ้า createDate เป็น DATE: whereDate เท่ากับวันนั้น
-        $d = \DateTime::createFromFormat('d/m/Y', $imDate);
-        if ($d) {
-            $q->whereDate('createDate', '=', $d->format('Y-m-d'));
-        }
-    }
-
-    // GROUP BY ต้องใช้ expression จริง ไม่ใช่ alias เพื่อให้ผ่าน ONLY_FULL_GROUP_BY
-    $q->groupBy(
-        \DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"),
-        'fabricId',
-        \DB::raw('TRIM(fabricStruct)'),
-        \DB::raw('TRIM(fabricPattern)'),
-        \DB::raw('TRIM(fabricW)')
-    );
-
-    // เรียงล่าสุด และแบ่งหน้า
-    $importorder = $q->orderByDesc('lastCreateDate')
-                     ->paginate(50)
-                     ->appends($request->except('page'));
-
-    // รายการสำหรับ typeahead โครงสร้าง (ส่งให้ view เสมอ)
-    $stockFabricStruct = \DB::table('stockfabrics')
-        ->selectRaw('TRIM(fabricStruct) AS fabricStruct, TRIM(fabricPattern) AS fabricPattern, TRIM(fabricW) AS fabricW')
-        ->groupBy(\DB::raw('TRIM(fabricStruct)'), \DB::raw('TRIM(fabricPattern)'), \DB::raw('TRIM(fabricW)'))
-        ->orderBy(\DB::raw('TRIM(fabricStruct)'))
-        ->limit(1000)
+    // เอา subquery มาห่ออีกชั้น แล้วค่อย group by ที่คอลัมน์ธรรมดา (หลบ ONLY_FULL_GROUP_BY)
+    $importorder = DB::query()->fromSub($base, 't')
+        ->selectRaw("
+            t.customer_norm   AS customer,
+            t.fabricId        AS fabricId,
+            t.fabricStruct_norm   AS fabricStruct,
+            t.fabricPattern_norm  AS fabricPattern,
+            t.fabricW_norm        AS fabricW,
+            MAX(t.createDate)     AS lastCreateDate,
+            COUNT(*)              AS foldCount,
+            SUM(t.sumYard)        AS sumYardSum,
+            MIN(t.refId)          AS refId
+        ")
+        ->groupBy('t.customer_norm', 't.fabricId', 't.fabricStruct_norm', 't.fabricPattern_norm', 't.fabricW_norm')
+        ->orderByDesc('lastCreateDate')
         ->get();
 
-    // เคส: ถ้าไม่กรอกอะไรเลย ให้ถือว่าเป็นการ “ดูทั้งหมด”
-    $noFilters =
-        $customer === '' && $fabricStruct === '' && $fabricPattern === '' &&
-        $fabricW === '' && $fabricId === '' && $imDate === '';
+    // สำหรับ list ด้านขวา/auto-suggest
+    $stockFabricStruct = stockfabric::groupBy(['fabricStruct', 'fabricPattern', 'fabricW'])
+        ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) AS foldCount, SUM(sumYard) AS sumYardSum, MAX(createDate) AS lastDate')
+        ->get();
 
-    if ($noFilters && $importorder->total() === 0) {
-        // ปกติไม่น่าจะเกิด แต่กันไว้
-        return redirect()->route('fabriccheck.index')->with('error', 'ไม่มีข้อมูลในระบบ');
-    }
+    // (ถ้าต้องใช้) รายการทั้งหมดล่าสุด
+    $records = stockfabric::groupBy(['fabricId','refId', 'fabricStruct', 'fabricPattern', 'fabricW','customer'])
+        ->selectRaw('fabricId, customer, refId, fabricStruct, MAX(createDate) as lastCreateDate, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum')
+        ->orderByDesc('lastCreateDate')
+        ->get();
+    $allfabricout = $records;
 
-    return view('fabricoutcheck.index', compact('importorder', 'stockFabricStruct'));
+    return view('fabricoutcheck.index', compact('importorder', 'stockFabricStruct', 'allfabricout'));
 }
 
-    
+
     public function store_back(Request $request)
     {
         //
