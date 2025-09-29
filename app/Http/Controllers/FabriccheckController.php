@@ -72,7 +72,85 @@ class FabriccheckController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+public function store(Request $request)
+{
+    // กดปุ่มค้นหา / ตรวจสอบ
+    if ($request->filled('submit') && $request->submit === 'searchImport') {
+
+        // สร้างคิวรีหลักสำหรับดึงข้อมูลเข้าสต็อก (stockfabric)
+        $q = \App\Models\stockfabric::query();
+
+        // เงื่อนไขกรองแบบละเอียด (มาจากปุ่ม "ตรวจสอบ" ของหน้าสต็อก หรือฟอร์มค้นหาเอง)
+        if ($request->filled('fabricStruct'))  { $q->where('fabricStruct',  'like', '%'.$request->fabricStruct.'%'); }
+        if ($request->filled('fabricPattern')) { $q->where('fabricPattern', 'like', '%'.$request->fabricPattern.'%'); }
+        if ($request->filled('fabricW'))       { $q->where('fabricW',       'like', '%'.$request->fabricW.'%'); }
+        if ($request->filled('customer'))      { $q->where('customer',      'like', '%'.$request->customer.'%'); }
+        if ($request->filled('fabricId'))      { $q->where('fabricId',      'like', '%'.$request->fabricId.'%'); }
+
+        // วันที่ (dd/mm/yyyy) -> Y-m-d
+        if ($request->filled('imDate')) {
+            $dateObj = date_create_from_format('d/m/Y', $request->imDate);
+            if ($dateObj) {
+                $fixed = $dateObj->format('Y-m-d');
+                // จะใช้ whereDate หรือ like ก็ได้ ตาม field จริงในฐานข้อมูล
+                $q->whereDate('createDate', $fixed);
+                // หรือ: $q->where('createDate', 'like', '%'.$fixed.'%');
+            }
+        }
+
+        // รายการผลลัพธ์ที่กรองแล้ว (กลุ่มตาม lot/refId)
+        $importorder = $q->groupBy('fabricId','refId','fabricStruct','fabricPattern','fabricW','customer')
+            ->selectRaw('
+                fabricId,
+                customer,
+                refId,
+                fabricStruct,
+                MAX(createDate) as lastCreateDate,
+                fabricPattern,
+                fabricW,
+                COUNT(fold)  as foldCount,
+                SUM(sumYard) as sumYardSum
+            ')
+            ->orderByDesc('lastCreateDate')
+            ->get();
+
+        // ตารางหลักด้านล่าง (แสดงรวมทั้งหมดล่าสุดไว้ประกอบ) — จะกรองหรือไม่กรองก็ได้
+        $allfabricout = \App\Models\stockfabric::groupBy('fabricId','refId','fabricStruct','fabricPattern','fabricW','customer')
+            ->selectRaw('
+                fabricId,
+                customer,
+                refId,
+                fabricStruct,
+                MAX(createDate) as lastCreateDate,
+                fabricPattern,
+                fabricW,
+                COUNT(fold)  as foldCount,
+                SUM(sumYard) as sumYardSum
+            ')
+            ->orderByDesc('lastCreateDate')
+            ->get();
+
+        // รายการโครงสร้างผ้า สำหรับ auto-suggest ในช่องค้นหา
+        $stockFabricStruct = \App\Models\stockfabric::groupBy('fabricStruct','fabricPattern','fabricW')
+            ->selectRaw('
+                fabricStruct,
+                fabricPattern,
+                fabricW,
+                COUNT(fold)  as foldCount,
+                SUM(sumYard) as sumYardSum,
+                MAX(createDate) as lastDate
+            ')
+            ->get();
+
+        return view('fabricoutcheck.index', compact('importorder', 'allfabricout', 'stockFabricStruct'));
+    }
+
+    // เคสอื่น ๆ ย้อนกลับ
+    return back();
+}
+
+
+    public function store_back(Request $request)
     {
         //
         if ($request->filled('submit') && $request->submit == 'searchImport') {

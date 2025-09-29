@@ -153,7 +153,19 @@
                                 <td>{{ $data->sumYardOut }}</td>
                                 <td>{{ $data->foldCountRemaining }}</td>
                                 <td>{{ $data->sumYardRemaining }}</td>
+
                                 <td>
+    <form method="post" action="{{ route('fabriccheck.store') }}">
+        @csrf
+        <input type="hidden" name="fabricStruct"  value="{{ $data->fabricStruct }}">
+        <input type="hidden" name="fabricPattern" value="{{ $data->fabricPattern }}">
+        <input type="hidden" name="fabricW"       value="{{ $data->fabricW }}">
+        <input type="hidden" name="customer"      value="{{ $data->customer }}">
+        <button name="submit" value="searchImport" class="btn_search">ตรวจสอบ</button>
+    </form>
+</td>
+
+                                <!-- <td>
                                     <form method="post" action="{{ route('inventory.store') }}" id="myForm">
                                         @csrf
                                         <input type="hidden" name="fabricStruct" value="{{ $data->fabricStruct }}">
@@ -163,7 +175,7 @@
                                         <input type="hidden" name="fabricId" value="{{ $data->fabricId }}">
                                         <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
                                     </form>
-                                </td>
+                                </td> -->
                             </tr>
                         @endforeach
                         </tbody>
