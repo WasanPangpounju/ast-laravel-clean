@@ -234,7 +234,7 @@ public function create()
     // 👉 เปลี่ยนมาใช้ตัวเลือกแบบเบาเครื่อง
 $stockLots = $this->stockPickerOptions();
 print_r($this->stockPickerOptions);
-print_r($customers);
+print_r("hello");
 return view('fabricout.create', compact(
     'customers','order_id','customer_name','fabric_struct',
     'orders','vatA','vatB','vatC',
