@@ -529,10 +529,10 @@ public function create_backup1()
             ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
             ->get();
 
-        return view('fabricout.create', compact(
-            'customers','order_id','customer_name','fabric_struct',
-            'orders','stockFabricStruct','vatA','vatB','vatC'
-        ));
+        // return view('fabricout.create', compact(
+        //     'customers','order_id','customer_name','fabric_struct',
+        //     'orders','stockFabricStruct','vatA','vatB','vatC'
+        // ));
     }
 
     /* ---------- 3) เตรียมค่า & Snapshot group key ---------- */
