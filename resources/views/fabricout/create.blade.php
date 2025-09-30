@@ -139,17 +139,7 @@
                                 ?>
 
                                 {{-- ============ เลือก "ตัดจากสต็อก" (เสมอ) ============ --}}
-                                <select name="stockCustomer" id="stockCustomer" class="form-control">
-  <option value="">— เลือกลูกค้า —</option>
-  @foreach($stockOptions->groupBy('customer') as $cust => $rows)
-    <option value="{{ $cust }}" {{ $selStockCustomer===$cust ? 'selected' : '' }}>
-      {{ $cust }}
-    </option>
-  @endforeach
-</select>
-
-{{-- โครงสร้าง/ลาย/หน้ากว้าง เลือกแบบเดียวกัน หรือทำ dependent dropdown ภายหลัง --}}
-
+                                
                                 <div class="form-group">
                                     <label for="stockPicker" style="font-weight:700">ตัดจากสต็อก (เลือกรายการ)</label>
                                     <input type="text" id="stockFilter" class="form-control"
