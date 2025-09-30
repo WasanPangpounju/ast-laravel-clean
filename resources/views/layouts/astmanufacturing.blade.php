@@ -314,6 +314,12 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
+                                    <a href="{{ route('stockfabric.index') }}" class="nav-link"><i
+                                            class="far fa-circle nav-icon"></i>
+                                        <p>สต็อกผ้า</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a href="{{ route('fabricdeposit.index') }}" class="nav-link"><i
                                             class="far fa-circle nav-icon"></i>
                                         <p>สต็อกผ้าฝากจัดเก็บ</p>
