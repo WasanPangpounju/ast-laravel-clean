@@ -140,6 +140,7 @@
 
                                 {{-- ============ เลือก "ตัดจากสต็อก" (เสมอ) ============ --}}
                                 <div class="form-group">
+                                    <label for="stockPicker">ตัดจากสต็อก (เลือกรายการ) — พบ {{ count($stockLots ?? []) }} รายการ</label>
                                     <label for="stockPicker" style="font-weight:700">ตัดจากสต็อก (เลือกรายการ)</label>
                                     <input type="text" id="stockFilter" class="form-control"
                                            placeholder="ค้นหา: ลูกค้า / โครงสร้าง / ลาย / หน้ากว้าง" style="margin-bottom:6px;">
