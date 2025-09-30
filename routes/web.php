@@ -39,6 +39,10 @@ Route::get('/', function () {
 Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+// ชั่วคราวเพื่อทดสอบ อย่าวางหลัง Route::resource('stockfabric', ...)
+Route::get('/stockfabric-lite', function () {
+    return response('STOCKFABRIC LITE OK', 200);
+});
 
 Route::resource('employee', EmployeeController::class );
 
