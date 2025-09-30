@@ -231,14 +231,25 @@ public function create()
     $selStockPattern  = $fg['stockFabricPattern'] ?? null;
     $selStockW        = $fg['stockFabricW']       ?? null;
 
-    return view('fabricout.create', compact(
-        'customers','order_id','customer_name','fabric_struct',
-        'orders','vatA','vatB','vatC',
-        // ส่งชุดตัวเลือกไปแทน stockLots
-        'stockOptions',
-        // ส่งของที่เลือกอยู่ไปโชว์ใต้ select
-        'selStockCustomer','selStockStruct','selStockPattern','selStockW'
-    ));
+    // 👉 เปลี่ยนมาใช้ตัวเลือกแบบเบาเครื่อง
+$stockLots = $this->stockPickerOptions();
+
+return view('fabricout.create', compact(
+    'customers','order_id','customer_name','fabric_struct',
+    'orders','vatA','vatB','vatC',
+    // ส่งตัวแปรที่ชื่อเดียวกับที่ Blade ใช้
+    'stockLots',
+    'selStockCustomer','selStockStruct','selStockPattern','selStockW'
+));
+
+    // return view('fabricout.create', compact(
+    //     'customers','order_id','customer_name','fabric_struct',
+    //     'orders','vatA','vatB','vatC',
+    //     // ส่งชุดตัวเลือกไปแทน stockLots
+    //     'stockOptions',
+    //     // ส่งของที่เลือกอยู่ไปโชว์ใต้ select
+    //     'selStockCustomer','selStockStruct','selStockPattern','selStockW'
+    // ));
 }
 
 public function create_backup1()

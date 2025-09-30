@@ -144,32 +144,33 @@
                                     <label for="stockPicker" style="font-weight:700">ตัดจากสต็อก (เลือกรายการ)</label>
                                     <input type="text" id="stockFilter" class="form-control"
                                            placeholder="ค้นหา: ลูกค้า / โครงสร้าง / ลาย / หน้ากว้าง" style="margin-bottom:6px;">
-                                    <select id="stockPicker" class="form-control" size="8">
-                                        <option value="">— เลือกสต็อก —</option>
-                                        @forelse(($stockLots ?? []) as $s)
-                                            @php
-                                                $isSelected =
-                                                    $selStockCustomer === $s->customer &&
-                                                    $selStockStruct   === $s->fabricStruct &&
-                                                    $selStockPattern  === $s->fabricPattern &&
-                                                    $selStockW        === $s->fabricW;
-                                            @endphp
-                                            <option
-                                                value="{{ $s->customer }}|{{ $s->fabricStruct }}|{{ $s->fabricPattern }}|{{ $s->fabricW }}"
-                                                data-customer="{{ $s->customer }}"
-                                                data-struct="{{ $s->fabricStruct }}"
-                                                data-pattern="{{ $s->fabricPattern }}"
-                                                data-w="{{ $s->fabricW }}"
-                                                {{ $isSelected ? 'selected' : '' }}
-                                            >
-                                                [{{ $s->customer }}]
-                                                {{ $s->fabricStruct }} | {{ $s->fabricPattern }} | {{ $s->fabricW }}''
-                                                — คงเหลือ {{ number_format($s->yardsRemaining,2) }} yd / {{ $s->foldsRemaining }} พับ
-                                            </option>
-                                        @empty
-                                            <option value="">(ไม่มีสต็อกคงเหลือให้เลือก)</option>
-                                        @endforelse
-                                    </select>
+<select id="stockPicker" class="form-control" size="8">
+  <option value="">— เลือกสต็อก —</option>
+  @forelse(($stockLots ?? []) as $s)
+    @php
+      $isSelected =
+        $selStockCustomer === $s->customer &&
+        $selStockStruct   === $s->fabricStruct &&
+        $selStockPattern  === $s->fabricPattern &&
+        $selStockW        === $s->fabricW;
+    @endphp
+    <option
+      value="{{ $s->customer }}|{{ $s->fabricStruct }}|{{ $s->fabricPattern }}|{{ $s->fabricW }}"
+      data-customer="{{ $s->customer }}"
+      data-struct="{{ $s->fabricStruct }}"
+      data-pattern="{{ $s->fabricPattern }}"
+      data-w="{{ $s->fabricW }}"
+      {{ $isSelected ? 'selected' : '' }}
+    >
+      [{{ $s->customer }}] {{ $s->fabricStruct }} | {{ $s->fabricPattern }} | {{ $s->fabricW }}''
+      @if(isset($s->yardsRemaining))
+        — คงเหลือ {{ number_format($s->yardsRemaining,2) }} yd / {{ $s->foldsRemaining ?? 0 }} พับ
+      @endif
+    </option>
+  @empty
+    <option value="">(ไม่มีรายการให้เลือก)</option>
+  @endforelse
+</select>
 
                                     @if(!empty($selStockStruct))
                                         <small class="text-muted d-block mt-1">
