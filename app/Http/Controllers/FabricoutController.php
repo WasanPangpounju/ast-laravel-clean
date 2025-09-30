@@ -233,15 +233,13 @@ public function create()
 
     // 👉 เปลี่ยนมาใช้ตัวเลือกแบบเบาเครื่อง
 $stockLots = $this->stockPickerOptions();
-print_r($this->stockPickerOptions);
-print_r("hello");
-// return view('fabricout.create', compact(
-//     'customers','order_id','customer_name','fabric_struct',
-//     'orders','vatA','vatB','vatC',
-//     // ส่งตัวแปรที่ชื่อเดียวกับที่ Blade ใช้
-//     'stockLots',
-//     'selStockCustomer','selStockStruct','selStockPattern','selStockW'
-// ));
+return view('fabricout.create', compact(
+    'customers','order_id','customer_name','fabric_struct',
+    'orders','vatA','vatB','vatC',
+    // ส่งตัวแปรที่ชื่อเดียวกับที่ Blade ใช้
+    'stockLots',
+    'selStockCustomer','selStockStruct','selStockPattern','selStockW'
+));
 
     // return view('fabricout.create', compact(
     //     'customers','order_id','customer_name','fabric_struct',
@@ -1114,11 +1112,36 @@ private function saveFabricData(
         $stockFabricStruct = stockfabric::groupBy(['fabricStruct','fabricPattern','fabricW'])
             ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
             ->get();
+if ($request->filled('submit') && $request->submit === 'generateByOrder') {
+    // 1) คำนวณเลข no, set session orderId ฯลฯ (ตามที่คุณมีอยู่เดิม)
+    $order_id = $request->input('orderId');
+    session()->put('orderId', $order_id);
 
-        return view('fabricout.create', compact(
-            'customers','order_id','customer_name','fabric_struct',
-            'orders','stockFabricStruct','vatA','vatB','vatC'
-        ));
+    $order_send  = AstPurchaseorder::select('customerName','fabricId','fabricStructure','fabricPattern')
+                    ->where('id', $order_id)->first();
+    $order_sendW = FabricAst::select('fabric_w')->where('purchaseOrder', $order_id)->first();
+
+    session()->put('customerName',  $order_send->customerName   ?? '');
+    session()->put('fabricStruct',  $order_send->fabricStructure ?? '');
+    session()->put('fabricPattern', $order_send->fabricPattern   ?? '');
+    session()->put('fabricW',       $order_sendW->fabric_w       ?? '');
+
+    $po = AstPurchaseorder::where('id', $order_id)->value('purchaseOrder');
+    session()->put('purchaseOrder', $po ?? '');
+
+    // ถ้าเคย snapshot ไว้แล้วจะเริ่มใบใหม่ -> เคลียร์ snapshot
+    session()->forget('fabricout_group');
+
+    // (ไม่ต้องเตรียม $stockFabricStruct / $stockLots ที่นี่ ให้ create() ทำ)
+
+    // 2) 👉 ไปให้ create() เตรียมทุกอย่าง (รวมทั้ง $stockLots)
+    return redirect()->route('fabricout.create');
+}
+
+        // return view('fabricout.create', compact(
+        //     'customers','order_id','customer_name','fabric_struct',
+        //     'orders','stockFabricStruct','vatA','vatB','vatC'
+        // ));
     }
 
     /* ---------- 3) เตรียมค่า & Snapshot group key ---------- */
