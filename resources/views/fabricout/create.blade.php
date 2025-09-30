@@ -139,39 +139,16 @@
                                 ?>
 
                                 {{-- ============ เลือก "ตัดจากสต็อก" (เสมอ) ============ --}}
-                                <div class="form-group">
-    <label for="stockPicker" style="font-weight:700">ตัดจากสต็อก (เลือกรายการ)</label>
-    <input type="text" id="stockFilter" class="form-control"
-           placeholder="ค้นหา: ลูกค้า / โครงสร้าง / ลาย / หน้ากว้าง" style="margin-bottom:6px;">
+                                <select name="stockCustomer" id="stockCustomer" class="form-control">
+  <option value="">— เลือกลูกค้า —</option>
+  @foreach($stockOptions->groupBy('customer') as $cust => $rows)
+    <option value="{{ $cust }}" {{ $selStockCustomer===$cust ? 'selected' : '' }}>
+      {{ $cust }}
+    </option>
+  @endforeach
+</select>
 
-    <select id="stockPicker" class="form-control" size="10">
-        <option value="">— เลือกสต็อก —</option>
-        @foreach ($stockLots as $s)
-            <option
-                value="{{ $s->customer }}|{{ $s->fabricStruct }}|{{ $s->fabricPattern }}|{{ $s->fabricW }}"
-                data-customer="{{ $s->customer }}"
-                data-struct="{{ $s->fabricStruct }}"
-                data-pattern="{{ $s->fabricPattern }}"
-                data-w="{{ $s->fabricW }}"
-            >
-                [{{ $s->customer }}]
-                {{ $s->fabricStruct }} | {{ $s->fabricPattern }} | {{ $s->fabricW }}''
-                — คงเหลือ {{ number_format($s->yardsRemaining, 2) }} yd ({{ $s->foldsRemaining }} พับ)
-                @if(!empty($s->lastDate))
-                    — ล่าสุด {{ \Carbon\Carbon::parse($s->lastDate)->format('d/m/Y') }}
-                @endif
-            </option>
-        @endforeach
-    </select>
-
-    @if(!empty($selStockStruct))
-        <small class="text-muted d-block mt-1">
-            สต็อกที่เลือกปัจจุบัน:
-            <b>[{{ $selStockCustomer }}]</b>
-            {{ $selStockStruct }} | {{ $selStockPattern }} | {{ $selStockW }}''
-        </small>
-    @endif
-</div>
+{{-- โครงสร้าง/ลาย/หน้ากว้าง เลือกแบบเดียวกัน หรือทำ dependent dropdown ภายหลัง --}}
 
                                 <div class="form-group">
                                     <label for="stockPicker" style="font-weight:700">ตัดจากสต็อก (เลือกรายการ)</label>

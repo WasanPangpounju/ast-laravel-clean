@@ -163,105 +163,23 @@ class FabricoutController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-// FabricoutController.php
-
-private function stockPickerData()
+// เบา: ดึงตัวเลือก customer/struct/pattern/width ตรง ๆ จาก stockfabrics
+private function stockPickerOptions()
 {
-    // อ้างชื่อตารางจริงจากโมเดล เพื่อกันสะกดไม่ตรง
-    $tblIns  = (new \App\Models\stockfabric())->getTable();  // โดยปกติ 'stockfabrics'
-    $tblOuts = (new \App\Models\fabricout())->getTable();    // โดยปกติ 'fabricouts'
+    $tbl = (new \App\Models\stockfabric())->getTable();
 
-    // ยอดเข้า (INS): group ตามลูกค้า/โครงสร้าง/ลาย/หน้ากว้าง
-    $insRows = DB::table($tblIns)
-        ->select([
-            DB::raw('customer'),
-            DB::raw('fabricStruct'),
-            DB::raw('fabricPattern'),
-            DB::raw('fabricW'),
-            DB::raw('COUNT(fold)    AS folds_in'),
-            DB::raw('SUM(sumYard)   AS yards_in'),
-            DB::raw('MAX(createDate) AS lastDate'),
-        ])
+    return DB::table($tbl)
+        ->select('customer','fabricStruct','fabricPattern','fabricW')
+        ->whereNotNull('customer')->where('customer','<>','')
+        ->whereNotNull('fabricStruct')->where('fabricStruct','<>','')
+        ->whereNotNull('fabricPattern')->where('fabricPattern','<>','')
+        ->whereNotNull('fabricW')->where('fabricW','<>','')
+        // ถ้าตารางใหญ่มาก ใส่ช่วงเวลาให้แคบลง เช่น 12 เดือนล่าสุด
+        //->where('createDate', '>=', now()->subMonths(12))
         ->groupBy('customer','fabricStruct','fabricPattern','fabricW')
+        ->orderBy('customer')
+        ->limit(2000) // กันหน้าระเบิด ถ้าอยากมากกว่านี้ค่อยขยับ
         ->get();
-
-    // ยอดออก (OUTS) ที่ “ตัดจากสต็อก” จริง (มีคีย์สต็อกครบ)
-    $outRows = DB::table($tblOuts)
-        ->select([
-            DB::raw('stockCustomer      AS customer'),
-            DB::raw('stockFabricStruct  AS fabricStruct'),
-            DB::raw('stockFabricPattern AS fabricPattern'),
-            DB::raw('stockFabricW       AS fabricW'),
-            DB::raw('COUNT(fold)  AS folds_out'),
-            DB::raw('SUM(sumYard) AS yards_out'),
-        ])
-        ->whereNotNull('stockFabricStruct')
-        ->whereNotNull('stockFabricPattern')
-        ->whereNotNull('stockFabricW')
-        ->groupBy('stockCustomer','stockFabricStruct','stockFabricPattern','stockFabricW')
-        ->get();
-
-    $norm = function ($v) {
-        $v = is_null($v) ? '' : $v;
-        return trim((string)$v);
-    };
-
-    // ทำดัชนียอด OUT หลัง normalize (fallback customer = 'AST')
-    $outIndex = [];
-    foreach ($outRows as $r) {
-        $customer      = $norm($r->customer) ?: 'AST';
-        $fabricStruct  = $norm($r->fabricStruct);
-        $fabricPattern = $norm($r->fabricPattern);
-        $fabricW       = $norm($r->fabricW);
-        if ($fabricStruct === '' || $fabricPattern === '' || $fabricW === '') continue;
-
-        $key = implode('|', [$customer,$fabricStruct,$fabricPattern,$fabricW]);
-        $outIndex[$key] = (object)[
-            'folds_out' => (int)($r->folds_out ?? 0),
-            'yards_out' => (float)($r->yards_out ?? 0),
-        ];
-    }
-
-    // รวม INS - OUT => REMAIN
-    $stock = [];
-    foreach ($insRows as $r) {
-        $customer      = $norm($r->customer) ?: 'AST';
-        $fabricStruct  = $norm($r->fabricStruct);
-        $fabricPattern = $norm($r->fabricPattern);
-        $fabricW       = $norm($r->fabricW);
-        if ($fabricStruct === '' || $fabricPattern === '' || $fabricW === '') continue;
-
-        $key = implode('|', [$customer,$fabricStruct,$fabricPattern,$fabricW]);
-
-        $foldsIn = (int)($r->folds_in ?? 0);
-        $yardsIn = (float)($r->yards_in ?? 0);
-        $foldsOut = (int)($outIndex[$key]->folds_out ?? 0);
-        $yardsOut = (float)($outIndex[$key]->yards_out ?? 0);
-
-        $foldsRem = max(0, $foldsIn - $foldsOut);
-        $yardsRem = max(0, $yardsIn - $yardsOut);
-
-        if ($foldsRem > 0 || $yardsRem > 0) {
-            $stock[$key] = (object)[
-                'customer'        => $customer,
-                'fabricStruct'    => $fabricStruct,
-                'fabricPattern'   => $fabricPattern,
-                'fabricW'         => $fabricW,
-                'foldsIn'         => $foldsIn,
-                'yardsIn'         => $yardsIn,
-                'foldsOut'        => $foldsOut,
-                'yardsOut'        => $yardsOut,
-                'foldsRemaining'  => $foldsRem,
-                'yardsRemaining'  => $yardsRem,
-                'lastDate'        => $r->lastDate ?? null,
-            ];
-        }
-    }
-
-    // เรียงตามคงเหลือมาก -> น้อย (เหมาะกับการเลือก)
-    return collect(array_values($stock))
-        ->sortByDesc('yardsRemaining')
-        ->values();
 }
 
 public function create()
@@ -274,30 +192,26 @@ public function create()
         ]);
     }
 
-    // Orders ที่อนุมัติให้ผลิต
     $ecp = FabricAststructure::select('purchaseOrder AS id')
-        ->where('yarnWRatio2', 'อนุมัติให้ผลิต')
-        ->get();
+        ->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
 
     $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
-        ->whereIn('id', $ecp)
-        ->orderBy('customerName')
-        ->get();
+        ->whereIn('id', $ecp)->orderBy('customerName')->get();
 
-    // เลขบิลแยกตามประเภท (ใช้ DB::raw)
+    // ใช้ DB::raw (ห้าม Fabricout::raw)
     $lastVat = Fabricout::groupBy('vatType')
         ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
         ->get();
 
-    $vatA = '1001'; $vatB = '1001'; $vatC = '1001';
+    $vatA='1001'; $vatB='1001'; $vatC='1001';
     foreach ($lastVat as $v) {
-        if ($v->vatType === 'A') $vatA = $v->max_no ? $v->max_no + 1 : '1001';
-        if ($v->vatType === 'B') $vatB = $v->max_no ? $v->max_no + 1 : '1001';
-        if ($v->vatType === 'C') $vatC = $v->max_no ? $v->max_no + 1 : '1001';
+        if ($v->vatType==='A') $vatA = $v->max_no ? $v->max_no+1 : '1001';
+        if ($v->vatType==='B') $vatB = $v->max_no ? $v->max_no+1 : '1001';
+        if ($v->vatType==='C') $vatC = $v->max_no ? $v->max_no+1 : '1001';
     }
 
-    // หาเลข no ล่าสุดแบบชัวร์ (กรณีไม่มี timestamps)
-    $lastRecord = Fabricout::orderBy('no', 'DESC')->first();
+    // หาเลข no ล่าสุดแบบชัวร์
+    $lastRecord = Fabricout::orderBy('no','DESC')->first();
     $no = $lastRecord ? ($lastRecord->no + 1) : 1001;
     if (!session()->has('no')) session()->put('no', $no);
 
@@ -307,10 +221,10 @@ public function create()
     $customer_name = '';
     $fabric_struct = '';
 
-    // ใช้ helper ที่รวมคงเหลือ "เหมือนหน้า สต็อกผ้า"
-    $stockLots = $this->stockPickerData();
+    // 👉 เปลี่ยนมาใช้ตัวเลือกแบบเบาเครื่อง
+    $stockOptions = $this->stockPickerOptions();
 
-    // ค่าที่เลือกปัจจุบัน (ไว้โชว์ใต้ select)
+    // (ถ้าต้องโชว์ “สต็อกที่เลือกปัจจุบัน” ใต้ select)
     $fg = session('fabricout_group', []);
     $selStockCustomer = $fg['stockCustomer']      ?? null;
     $selStockStruct   = $fg['stockFabricStruct']  ?? null;
@@ -319,7 +233,10 @@ public function create()
 
     return view('fabricout.create', compact(
         'customers','order_id','customer_name','fabric_struct',
-        'orders','vatA','vatB','vatC','stockLots',
+        'orders','vatA','vatB','vatC',
+        // ส่งชุดตัวเลือกไปแทน stockLots
+        'stockOptions',
+        // ส่งของที่เลือกอยู่ไปโชว์ใต้ select
         'selStockCustomer','selStockStruct','selStockPattern','selStockW'
     ));
 }
