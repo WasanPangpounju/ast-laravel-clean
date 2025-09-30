@@ -138,7 +138,6 @@
                     </li>
 
                     <!-- ระบบคลังสินค้า (ปิดทั้งบล็อกนี้) -->
-                    {{--
                     <li class="nav-item">
                         <a href="#" class="nav-link">
                             <i class="nav-icon fas fa-folder"></i>
@@ -155,7 +154,6 @@
                             <li class="nav-item"><a href="{{ url('/fabricdeposit') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>สต็อกผ้าฝากจัดเก็บ</p></a></li>
                         </ul>
                     </li>
-                    --}}
 
                     <!-- ระบบผลิตสินค้า (ยังไม่มีรายการย่อยในโค้ดเดิม — แสดงหัวข้อเฉย ๆ) -->
                     <li class="nav-item">
