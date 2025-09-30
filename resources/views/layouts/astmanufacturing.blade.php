@@ -227,11 +227,11 @@
                     </div>
                     <div class="info">
                         <a href="#" class="d-block">
-                            <!-- <p>{{ Auth::user()->name }}</p>{{ Auth::user()->user_type }} -->
+                            <p>{{ Auth::user()->name }}</p>{{ Auth::user()->user_type }}
                         </a>
                     </div>
                 </div>
-                <nav class="mt-2">
+                <!-- <nav class="mt-2">
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
                         <li class="nav-item">
@@ -405,7 +405,7 @@
                                 <p> ตั้งค่า</p>
                             </a></li>
                     </ul>
-                </nav>
+                </nav> -->
             </div><!-- /.sidebar -->
         </aside>
 
