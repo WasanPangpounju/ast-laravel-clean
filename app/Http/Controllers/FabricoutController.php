@@ -163,9 +163,123 @@ class FabricoutController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-// ใช้ด้านบนของไฟล์แล้วมี use Illuminate\Support\Facades\DB; อยู่แล้ว
-
 public function create()
+{
+    // ถ้ายังไม่มีการกรอกพับ (endCount <= 0) เคลียร์ session เก่าก่อน
+    if ((int) (session()->get('endCount') ?? 0) <= 0) {
+        session()->forget([
+            'endCount','dt','customerName','receiveName','comment','receiveType','orderId',
+            'fabricStruct','fabricPattern','fabricW','customerReplace','fabricStructReplace',
+            'vatNo','vatType','purchaseOrder','fabricout_group','refId','sum','no'
+        ]);
+    }
+
+    // ==== ออเดอร์ที่อนุมัติให้ผลิต ====
+    // ใช้ pluck id ออกมาตรง ๆ เพื่อ whereIn('id', ...)
+    $ecpIds = FabricAststructure::where('yarnWRatio2', 'อนุมัติให้ผลิต')
+                ->pluck('purchaseOrder');
+
+    $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
+                ->whereIn('id', $ecpIds)
+                ->orderBy('customerName')
+                ->get();
+
+    // ==== เลขบิล A/B/C (ใช้ DB::raw) ====
+    $lastVat = Fabricout::groupBy('vatType')
+        ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
+        ->get();
+
+    $vatA = '1001'; $vatB = '1001'; $vatC = '1001';
+    foreach ($lastVat as $v) {
+        $next = $v->max_no ? ((int)$v->max_no + 1) : 1001;
+        if ($v->vatType === 'A') $vatA = (string)$next;
+        if ($v->vatType === 'B') $vatB = (string)$next;
+        if ($v->vatType === 'C') $vatC = (string)$next;
+    }
+
+    // ==== เลข no ต่อเนื่อง (ถ้าไม่มี timestamps ให้ยึดตาม no) ====
+    $lastRecord = Fabricout::orderByDesc('no')->first();
+    $no = $lastRecord ? ((int)$lastRecord->no + 1) : 1001;
+    if (!session()->has('no')) {
+        session()->put('no', $no);
+    }
+
+    // ลูกค้า (สำหรับ auto-complete)
+    $customers = Customer::orderBy('name')->get();
+
+    $order_id       = '';
+    $customer_name  = '';
+    $fabric_struct  = '';
+
+    // =========================
+    //   คิด “สต็อกคงเหลือ” ต่อกุญแจ: customer + fabricStruct + fabricPattern + fabricW
+    //   - normalize ค่าฝั่งเข้า (stockfabrics) และฝั่งออก (fabricouts) ให้ trim/COALESCE
+    //   - ตัดสต็อกเฉพาะที่มีคีย์ตัดชัดเจน (stockFabricStruct not null)
+    // =========================
+    $ins = DB::table('stockfabrics')
+        ->selectRaw("
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
+            TRIM(fabricStruct)  AS fabricStruct,
+            TRIM(fabricPattern) AS fabricPattern,
+            TRIM(fabricW)       AS fabricW,
+            COUNT(fold)         AS folds_in,
+            SUM(sumYard)        AS yards_in,
+            MAX(createDate)     AS lastDate
+        ")
+        ->whereNotNull('fabricStruct')->where('fabricStruct','<>','')
+        ->groupBy('customer','fabricStruct','fabricPattern','fabricW')
+        ->get();
+
+    $outs = DB::table('fabricouts')
+        ->selectRaw("
+            COALESCE(NULLIF(TRIM(stockCustomer), ''), 'AST') AS customer,
+            TRIM(stockFabricStruct)  AS fabricStruct,
+            TRIM(stockFabricPattern) AS fabricPattern,
+            TRIM(stockFabricW)       AS fabricW,
+            COUNT(fold)              AS folds_out,
+            SUM(sumYard)             AS yards_out
+        ")
+        ->whereNotNull('stockFabricStruct') // ตัดเฉพาะที่เลือกตัดจากสต็อกจริง
+        ->groupBy('customer','fabricStruct','fabricPattern','fabricW')
+        ->get();
+
+    $stockLots = $ins->map(function($in) use ($outs) {
+            $out = $outs->first(function($o) use ($in){
+                return $o->customer      === $in->customer
+                    && $o->fabricStruct  === $in->fabricStruct
+                    && $o->fabricPattern === $in->fabricPattern
+                    && $o->fabricW       === $in->fabricW;
+            });
+
+            $foldsOut = (int)($out->folds_out ?? 0);
+            $yardsOut = (float)($out->yards_out ?? 0);
+
+            return (object)[
+                'customer'        => $in->customer,
+                'fabricStruct'    => $in->fabricStruct,
+                'fabricPattern'   => $in->fabricPattern,
+                'fabricW'         => $in->fabricW,
+                'foldsIn'         => (int)$in->folds_in,
+                'yardsIn'         => (float)$in->yards_in,
+                'foldsOut'        => $foldsOut,
+                'yardsOut'        => $yardsOut,
+                'foldsRemaining'  => max(0, (int)$in->folds_in - $foldsOut),
+                'yardsRemaining'  => max(0, (float)$in->yards_in - $yardsOut),
+                'lastDate'        => $in->lastDate,
+            ];
+        })
+        ->filter(fn($r) => ($r->foldsRemaining > 0) || ($r->yardsRemaining > 0))
+        ->sortByDesc('yardsRemaining')
+        ->values();
+
+    // ส่งค่าไปที่ view (สำคัญ: ต้องมี $stockLots เพื่อให้ dropdown “ตัดจากสต็อก” มีรายการ)
+    return view('fabricout.create', compact(
+        'customers','order_id','customer_name','fabric_struct',
+        'orders','vatA','vatB','vatC','stockLots'
+    ));
+}
+
+public function create_backup1()
 {
     if (session()->get('endCount') <= 0) {
         session()->forget([
