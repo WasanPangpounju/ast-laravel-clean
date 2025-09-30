@@ -227,7 +227,7 @@
                     </div>
                     <div class="info">
                         <a href="#" class="d-block">
-                            <p>{{ Auth::user()->name }}</p>{{ Auth::user()->user_type }}
+                            <!-- <p>{{ Auth::user()->name }}</p>{{ Auth::user()->user_type }} -->
                         </a>
                     </div>
                 </div>
