@@ -235,13 +235,13 @@ public function create()
 $stockLots = $this->stockPickerOptions();
 print_r($this->stockPickerOptions);
 print_r("hello");
-return view('fabricout.create', compact(
-    'customers','order_id','customer_name','fabric_struct',
-    'orders','vatA','vatB','vatC',
-    // ส่งตัวแปรที่ชื่อเดียวกับที่ Blade ใช้
-    'stockLots',
-    'selStockCustomer','selStockStruct','selStockPattern','selStockW'
-));
+// return view('fabricout.create', compact(
+//     'customers','order_id','customer_name','fabric_struct',
+//     'orders','vatA','vatB','vatC',
+//     // ส่งตัวแปรที่ชื่อเดียวกับที่ Blade ใช้
+//     'stockLots',
+//     'selStockCustomer','selStockStruct','selStockPattern','selStockW'
+// ));
 
     // return view('fabricout.create', compact(
     //     'customers','order_id','customer_name','fabric_struct',
