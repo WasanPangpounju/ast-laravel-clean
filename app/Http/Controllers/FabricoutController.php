@@ -266,6 +266,66 @@ private function stockPickerData()
 
 public function create()
 {
+    if ((int)session()->get('endCount', 0) <= 0) {
+        session()->forget([
+            'endCount','dt','customerName','receiveName','comment','receiveType','orderId',
+            'fabricStruct','fabricPattern','fabricW','customerReplace','fabricStructReplace',
+            'vatNo','vatType'
+        ]);
+    }
+
+    // Orders ที่อนุมัติให้ผลิต
+    $ecp = FabricAststructure::select('purchaseOrder AS id')
+        ->where('yarnWRatio2', 'อนุมัติให้ผลิต')
+        ->get();
+
+    $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
+        ->whereIn('id', $ecp)
+        ->orderBy('customerName')
+        ->get();
+
+    // เลขบิลแยกตามประเภท (ใช้ DB::raw)
+    $lastVat = Fabricout::groupBy('vatType')
+        ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
+        ->get();
+
+    $vatA = '1001'; $vatB = '1001'; $vatC = '1001';
+    foreach ($lastVat as $v) {
+        if ($v->vatType === 'A') $vatA = $v->max_no ? $v->max_no + 1 : '1001';
+        if ($v->vatType === 'B') $vatB = $v->max_no ? $v->max_no + 1 : '1001';
+        if ($v->vatType === 'C') $vatC = $v->max_no ? $v->max_no + 1 : '1001';
+    }
+
+    // หาเลข no ล่าสุดแบบชัวร์ (กรณีไม่มี timestamps)
+    $lastRecord = Fabricout::orderBy('no', 'DESC')->first();
+    $no = $lastRecord ? ($lastRecord->no + 1) : 1001;
+    if (!session()->has('no')) session()->put('no', $no);
+
+    $customers = Customer::orderBy('name')->get();
+
+    $order_id = '';
+    $customer_name = '';
+    $fabric_struct = '';
+
+    // ใช้ helper ที่รวมคงเหลือ "เหมือนหน้า สต็อกผ้า"
+    $stockLots = $this->stockPickerData();
+
+    // ค่าที่เลือกปัจจุบัน (ไว้โชว์ใต้ select)
+    $fg = session('fabricout_group', []);
+    $selStockCustomer = $fg['stockCustomer']      ?? null;
+    $selStockStruct   = $fg['stockFabricStruct']  ?? null;
+    $selStockPattern  = $fg['stockFabricPattern'] ?? null;
+    $selStockW        = $fg['stockFabricW']       ?? null;
+
+    return view('fabricout.create', compact(
+        'customers','order_id','customer_name','fabric_struct',
+        'orders','vatA','vatB','vatC','stockLots',
+        'selStockCustomer','selStockStruct','selStockPattern','selStockW'
+    ));
+}
+
+public function create_backup1()
+{
     if (session()->get('endCount') <= 0) {
         session()->forget([
             'endCount','dt','customerName','receiveName','comment','receiveType','orderId',
@@ -356,13 +416,6 @@ public function create()
     // จัดเรียงให้เลือกง่าย: มากไปน้อยตาม yardsRemaining
     ->sortByDesc('yardsRemaining')
     ->values();
-
-    $stockLots = $this->stockPickerData();
-
-return view('fabricout.create', compact(
-    'customers','order_id','customer_name','fabric_struct',
-    'orders','vatA','vatB','vatC','stockLots'
-));
 
     return view('fabricout.create', compact(
         'customers','order_id','customer_name','fabric_struct',
