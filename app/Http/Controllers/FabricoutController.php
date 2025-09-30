@@ -198,65 +198,6 @@ public function create()
     $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
         ->whereIn('id', $ecp)->orderBy('customerName')->get();
 
-    $lastVat = Fabricout::groupBy('vatType')
-        ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
-        ->get();
-
-    $vatA='1001'; $vatB='1001'; $vatC='1001';
-    foreach ($lastVat as $v) {
-        if ($v->vatType==='A') $vatA = $v->max_no ? $v->max_no+1 : '1001';
-        if ($v->vatType==='B') $vatB = $v->max_no ? $v->max_no+1 : '1001';
-        if ($v->vatType==='C') $vatC = $v->max_no ? $v->max_no+1 : '1001';
-    }
-
-    $lastRecord = Fabricout::orderBy('no','DESC')->first();
-    $no = $lastRecord ? ($lastRecord->no + 1) : 1001;
-    if (!session()->has('no')) session()->put('no', $no);
-
-    $customers = Customer::orderBy('name')->get();
-
-    $order_id = '';
-    $customer_name = '';
-    $fabric_struct = '';
-
-    // ดึงรายการสต็อก (ชุดเดียวกับ dropdown)
-    $stockLots = $this->stockPickerOptions();
-
-    // ===== สำคัญ: ตั้งค่าที่จะใช้ preselect ด้วย fallback =====
-    $fg = session('fabricout_group', []);
-    $selStockCustomer = old('stockCustomer')
-        ?? ($fg['stockCustomer']      ?? (session('customerName') ?: 'AST'));
-    $selStockStruct   = old('stockFabricStruct')
-        ?? ($fg['stockFabricStruct']  ?? session('fabricStruct'));
-    $selStockPattern  = old('stockFabricPattern')
-        ?? ($fg['stockFabricPattern'] ?? session('fabricPattern'));
-    $selStockW        = old('stockFabricW')
-        ?? ($fg['stockFabricW']       ?? session('fabricW'));
-
-    return view('fabricout.create', compact(
-        'customers','order_id','customer_name','fabric_struct',
-        'orders','vatA','vatB','vatC',
-        'stockLots',
-        'selStockCustomer','selStockStruct','selStockPattern','selStockW'
-    ));
-}
-
-public function create_backup2()
-{
-    if ((int)session()->get('endCount', 0) <= 0) {
-        session()->forget([
-            'endCount','dt','customerName','receiveName','comment','receiveType','orderId',
-            'fabricStruct','fabricPattern','fabricW','customerReplace','fabricStructReplace',
-            'vatNo','vatType'
-        ]);
-    }
-
-    $ecp = FabricAststructure::select('purchaseOrder AS id')
-        ->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
-
-    $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
-        ->whereIn('id', $ecp)->orderBy('customerName')->get();
-
     // ใช้ DB::raw (ห้าม Fabricout::raw)
     $lastVat = Fabricout::groupBy('vatType')
         ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
@@ -544,81 +485,55 @@ public function create_backup1()
         return view('fabricout.index', compact('importFabricout','select_search','searchInput'));
     }
 
-    if ($request->filled('submit') && $request->submit === 'generateByOrder') {
-    // 1) คำนวณเลข no, set session orderId ฯลฯ (ตามที่คุณมีอยู่เดิม)
-    $order_id = $request->input('orderId');
-    session()->put('orderId', $order_id);
-
-    $order_send  = AstPurchaseorder::select('customerName','fabricId','fabricStructure','fabricPattern')
-                    ->where('id', $order_id)->first();
-    $order_sendW = FabricAst::select('fabric_w')->where('purchaseOrder', $order_id)->first();
-
-    session()->put('customerName',  $order_send->customerName   ?? '');
-    session()->put('fabricStruct',  $order_send->fabricStructure ?? '');
-    session()->put('fabricPattern', $order_send->fabricPattern   ?? '');
-    session()->put('fabricW',       $order_sendW->fabric_w       ?? '');
-
-    $po = AstPurchaseorder::where('id', $order_id)->value('purchaseOrder');
-    session()->put('purchaseOrder', $po ?? '');
-
-    // ถ้าเคย snapshot ไว้แล้วจะเริ่มใบใหม่ -> เคลียร์ snapshot
-    session()->forget('fabricout_group');
-
-    // (ไม่ต้องเตรียม $stockFabricStruct / $stockLots ที่นี่ ให้ create() ทำ)
-
-    // 2) 👉 ไปให้ create() เตรียมทุกอย่าง (รวมทั้ง $stockLots)
-    return redirect()->route('fabricout.create');
-}
-
     /* ---------- 2) generateByOrder ---------- */
-    // if ($request->filled('submit') && $request->submit === 'generateByOrder') {
-    //     $customers  = Customer::orderBy('name')->get();
+    if ($request->filled('submit') && $request->submit === 'generateByOrder') {
+        $customers  = Customer::orderBy('name')->get();
 
-    //     $lastRecord = Fabricout::latest()->first();
-    //     $no         = $lastRecord ? ($lastRecord->no + 1) : 1001;
-    //     if (!session()->has('no')) session()->put('no', $no);
+        $lastRecord = Fabricout::latest()->first();
+        $no         = $lastRecord ? ($lastRecord->no + 1) : 1001;
+        if (!session()->has('no')) session()->put('no', $no);
 
-    //     $order_id = $request->input('orderId');
-    //     session()->put('orderId', $order_id);
+        $order_id = $request->input('orderId');
+        session()->put('orderId', $order_id);
 
-    //     $order_send  = AstPurchaseorder::select('customerName','fabricId','fabricStructure','fabricPattern')
-    //                     ->where('id', $order_id)->get();
-    //     $order_sendW = FabricAst::select('fabric_w')->where('purchaseOrder', $order_id)->get();
+        $order_send  = AstPurchaseorder::select('customerName','fabricId','fabricStructure','fabricPattern')
+                        ->where('id', $order_id)->get();
+        $order_sendW = FabricAst::select('fabric_w')->where('purchaseOrder', $order_id)->get();
 
-    //     session()->put('customerName',  $order_send[0]->customerName   ?? '');
-    //     session()->put('fabricStruct',  $order_send[0]->fabricStructure ?? '');
-    //     session()->put('fabricPattern', $order_send[0]->fabricPattern   ?? '');
-    //     session()->put('fabricW',       $order_sendW[0]->fabric_w       ?? '');
+        session()->put('customerName',  $order_send[0]->customerName   ?? '');
+        session()->put('fabricStruct',  $order_send[0]->fabricStructure ?? '');
+        session()->put('fabricPattern', $order_send[0]->fabricPattern   ?? '');
+        session()->put('fabricW',       $order_sendW[0]->fabric_w       ?? '');
 
-    //     $po = AstPurchaseorder::where('id', $order_id)->value('purchaseOrder');
-    //     session()->put('purchaseOrder', $po ?? '');
+        $po = AstPurchaseorder::where('id', $order_id)->value('purchaseOrder');
+        session()->put('purchaseOrder', $po ?? '');
 
-    //     session()->forget('fabricout_group');
+        session()->forget('fabricout_group');
 
-    //     $lastVat = Fabricout::groupBy('vatType')
-    //         ->select('vatType', Fabricout::raw('MAX(vatNo) as max_no'))->get();
-    //     $vatA = '1001'; $vatB = '1001'; $vatC = '1001';
-    //     foreach ($lastVat as $v) {
-    //         if ($v->vatType === 'A') $vatA = $v->max_no ? $v->max_no + 1 : '1001';
-    //         if ($v->vatType === 'B') $vatB = $v->max_no ? $v->max_no + 1 : '1001';
-    //         if ($v->vatType === 'C') $vatC = $v->max_no ? $v->max_no + 1 : '1001';
-    //     }
+        $lastVat = Fabricout::groupBy('vatType')
+            ->select('vatType', Fabricout::raw('MAX(vatNo) as max_no'))->get();
+        $vatA = '1001'; $vatB = '1001'; $vatC = '1001';
+        foreach ($lastVat as $v) {
+            if ($v->vatType === 'A') $vatA = $v->max_no ? $v->max_no + 1 : '1001';
+            if ($v->vatType === 'B') $vatB = $v->max_no ? $v->max_no + 1 : '1001';
+            if ($v->vatType === 'C') $vatC = $v->max_no ? $v->max_no + 1 : '1001';
+        }
 
-    //     $ecp    = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2','อนุมัติให้ผลิต')->get();
-    //     $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
-    //                 ->whereIn('id',$ecp)->orderBy('customerName')->get();
+        $ecp    = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2','อนุมัติให้ผลิต')->get();
+        $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
+                    ->whereIn('id',$ecp)->orderBy('customerName')->get();
 
-    //     $customer_name     = session('customerName','');
-    //     $fabric_struct     = '';
-    //     $stockFabricStruct = stockfabric::groupBy(['fabricStruct','fabricPattern','fabricW'])
-    //         ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
-    //         ->get();
+        $customer_name     = session('customerName','');
+        $fabric_struct     = '';
+        $stockFabricStruct = stockfabric::groupBy(['fabricStruct','fabricPattern','fabricW'])
+            ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
+            ->get();
 
-    //     // return view('fabricout.create', compact(
-    //     //     'customers','order_id','customer_name','fabric_struct',
-    //     //     'orders','stockFabricStruct','vatA','vatB','vatC'
-    //     // ));
-    // }
+        return view('fabricout.create', compact(
+            'customers','order_id','customer_name','fabric_struct',
+            'orders','stockFabricStruct','vatA','vatB','vatC'
+        ));
+    }
 
     /* ---------- 3) เตรียมค่า & Snapshot group key ---------- */
     $fixedDate = str_replace('/', '-', $request->input('dt') ?: date('Y-m-d'));
