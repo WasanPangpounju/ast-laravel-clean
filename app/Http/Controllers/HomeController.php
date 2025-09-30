@@ -21,11 +21,8 @@ class HomeController extends Controller
      *
      * @return \Illuminate\Contracts\Support\Renderable
      */
-    public function index() {
-    return view('home-lite'); // ไฟล์ที่เป็น HTML เปล่า ๆ
-}
 
-    public function index_back()
+    public function index()
     {
         return view('home');
     }
