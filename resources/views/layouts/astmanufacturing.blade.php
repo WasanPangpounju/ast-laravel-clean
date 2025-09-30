@@ -222,6 +222,15 @@
             <!-- Sidebar -->
             <div class="sidebar">
                 <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+  <div class="image">
+    <img src="{{ asset('assets/images/admin.jpg') }}" class="img-circle" alt="User Image">
+  </div>
+  <div class="info">
+    <a href="#" class="d-block">ผู้ใช้งาน</a>
+  </div>
+</div>
+
+                <!-- <div class="user-panel mt-3 pb-3 mb-3 d-flex">
                     <div class="image">
                         <img src="<?php echo asset('assets/images/admin.jpg'); ?>" class="img-circle" alt="User Image">
                     </div>
@@ -230,7 +239,7 @@
                             <p>{{ Auth::user()->name }}</p>{{ Auth::user()->user_type }}
                         </a>
                     </div>
-                </div>
+                </div> -->
                 <!-- <nav class="mt-2">
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
