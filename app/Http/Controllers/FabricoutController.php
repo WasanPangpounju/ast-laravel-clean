@@ -163,6 +163,106 @@ class FabricoutController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+// FabricoutController.php
+
+private function stockPickerData()
+{
+    // อ้างชื่อตารางจริงจากโมเดล เพื่อกันสะกดไม่ตรง
+    $tblIns  = (new \App\Models\stockfabric())->getTable();  // โดยปกติ 'stockfabrics'
+    $tblOuts = (new \App\Models\fabricout())->getTable();    // โดยปกติ 'fabricouts'
+
+    // ยอดเข้า (INS): group ตามลูกค้า/โครงสร้าง/ลาย/หน้ากว้าง
+    $insRows = DB::table($tblIns)
+        ->select([
+            DB::raw('customer'),
+            DB::raw('fabricStruct'),
+            DB::raw('fabricPattern'),
+            DB::raw('fabricW'),
+            DB::raw('COUNT(fold)    AS folds_in'),
+            DB::raw('SUM(sumYard)   AS yards_in'),
+            DB::raw('MAX(createDate) AS lastDate'),
+        ])
+        ->groupBy('customer','fabricStruct','fabricPattern','fabricW')
+        ->get();
+
+    // ยอดออก (OUTS) ที่ “ตัดจากสต็อก” จริง (มีคีย์สต็อกครบ)
+    $outRows = DB::table($tblOuts)
+        ->select([
+            DB::raw('stockCustomer      AS customer'),
+            DB::raw('stockFabricStruct  AS fabricStruct'),
+            DB::raw('stockFabricPattern AS fabricPattern'),
+            DB::raw('stockFabricW       AS fabricW'),
+            DB::raw('COUNT(fold)  AS folds_out'),
+            DB::raw('SUM(sumYard) AS yards_out'),
+        ])
+        ->whereNotNull('stockFabricStruct')
+        ->whereNotNull('stockFabricPattern')
+        ->whereNotNull('stockFabricW')
+        ->groupBy('stockCustomer','stockFabricStruct','stockFabricPattern','stockFabricW')
+        ->get();
+
+    $norm = function ($v) {
+        $v = is_null($v) ? '' : $v;
+        return trim((string)$v);
+    };
+
+    // ทำดัชนียอด OUT หลัง normalize (fallback customer = 'AST')
+    $outIndex = [];
+    foreach ($outRows as $r) {
+        $customer      = $norm($r->customer) ?: 'AST';
+        $fabricStruct  = $norm($r->fabricStruct);
+        $fabricPattern = $norm($r->fabricPattern);
+        $fabricW       = $norm($r->fabricW);
+        if ($fabricStruct === '' || $fabricPattern === '' || $fabricW === '') continue;
+
+        $key = implode('|', [$customer,$fabricStruct,$fabricPattern,$fabricW]);
+        $outIndex[$key] = (object)[
+            'folds_out' => (int)($r->folds_out ?? 0),
+            'yards_out' => (float)($r->yards_out ?? 0),
+        ];
+    }
+
+    // รวม INS - OUT => REMAIN
+    $stock = [];
+    foreach ($insRows as $r) {
+        $customer      = $norm($r->customer) ?: 'AST';
+        $fabricStruct  = $norm($r->fabricStruct);
+        $fabricPattern = $norm($r->fabricPattern);
+        $fabricW       = $norm($r->fabricW);
+        if ($fabricStruct === '' || $fabricPattern === '' || $fabricW === '') continue;
+
+        $key = implode('|', [$customer,$fabricStruct,$fabricPattern,$fabricW]);
+
+        $foldsIn = (int)($r->folds_in ?? 0);
+        $yardsIn = (float)($r->yards_in ?? 0);
+        $foldsOut = (int)($outIndex[$key]->folds_out ?? 0);
+        $yardsOut = (float)($outIndex[$key]->yards_out ?? 0);
+
+        $foldsRem = max(0, $foldsIn - $foldsOut);
+        $yardsRem = max(0, $yardsIn - $yardsOut);
+
+        if ($foldsRem > 0 || $yardsRem > 0) {
+            $stock[$key] = (object)[
+                'customer'        => $customer,
+                'fabricStruct'    => $fabricStruct,
+                'fabricPattern'   => $fabricPattern,
+                'fabricW'         => $fabricW,
+                'foldsIn'         => $foldsIn,
+                'yardsIn'         => $yardsIn,
+                'foldsOut'        => $foldsOut,
+                'yardsOut'        => $yardsOut,
+                'foldsRemaining'  => $foldsRem,
+                'yardsRemaining'  => $yardsRem,
+                'lastDate'        => $r->lastDate ?? null,
+            ];
+        }
+    }
+
+    // เรียงตามคงเหลือมาก -> น้อย (เหมาะกับการเลือก)
+    return collect(array_values($stock))
+        ->sortByDesc('yardsRemaining')
+        ->values();
+}
 
 public function create()
 {
@@ -256,6 +356,13 @@ public function create()
     // จัดเรียงให้เลือกง่าย: มากไปน้อยตาม yardsRemaining
     ->sortByDesc('yardsRemaining')
     ->values();
+
+    $stockLots = $this->stockPickerData();
+
+return view('fabricout.create', compact(
+    'customers','order_id','customer_name','fabric_struct',
+    'orders','vatA','vatB','vatC','stockLots'
+));
 
     return view('fabricout.create', compact(
         'customers','order_id','customer_name','fabric_struct',
