@@ -165,7 +165,7 @@ class FabricoutController extends Controller
      */
 public function create()
 {
-    // ถ้ายังไม่มีการกรอกพับ (endCount <= 0) เคลียร์ session เก่าก่อน
+    // เคลียร์เซสชันเก่าเมื่อยังไม่มีการกรอกพับ
     if ((int) (session()->get('endCount') ?? 0) <= 0) {
         session()->forget([
             'endCount','dt','customerName','receiveName','comment','receiveType','orderId',
@@ -174,17 +174,14 @@ public function create()
         ]);
     }
 
-    // ==== ออเดอร์ที่อนุมัติให้ผลิต ====
-    // ใช้ pluck id ออกมาตรง ๆ เพื่อ whereIn('id', ...)
-    $ecpIds = FabricAststructure::where('yarnWRatio2', 'อนุมัติให้ผลิต')
-                ->pluck('purchaseOrder');
-
+    // ===== ออเดอร์ที่อนุมัติให้ผลิต =====
+    $ecpIds = FabricAststructure::where('yarnWRatio2', 'อนุมัติให้ผลิต')->pluck('purchaseOrder');
     $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
-                ->whereIn('id', $ecpIds)
-                ->orderBy('customerName')
-                ->get();
+        ->whereIn('id', $ecpIds)
+        ->orderBy('customerName')
+        ->get();
 
-    // ==== เลขบิล A/B/C (ใช้ DB::raw) ====
+    // ===== เลขบิล A/B/C =====
     $lastVat = Fabricout::groupBy('vatType')
         ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
         ->get();
@@ -197,25 +194,25 @@ public function create()
         if ($v->vatType === 'C') $vatC = (string)$next;
     }
 
-    // ==== เลข no ต่อเนื่อง (ถ้าไม่มี timestamps ให้ยึดตาม no) ====
+    // ===== เลข no ต่อเนื่อง =====
     $lastRecord = Fabricout::orderByDesc('no')->first();
     $no = $lastRecord ? ((int)$lastRecord->no + 1) : 1001;
-    if (!session()->has('no')) {
-        session()->put('no', $no);
-    }
+    if (!session()->has('no')) session()->put('no', $no);
 
-    // ลูกค้า (สำหรับ auto-complete)
+    // ลูกค้า (autocomplete)
     $customers = Customer::orderBy('name')->get();
 
-    $order_id       = '';
-    $customer_name  = '';
-    $fabric_struct  = '';
+    $order_id      = '';
+    $customer_name = '';
+    $fabric_struct = '';
 
-    // =========================
-    //   คิด “สต็อกคงเหลือ” ต่อกุญแจ: customer + fabricStruct + fabricPattern + fabricW
-    //   - normalize ค่าฝั่งเข้า (stockfabrics) และฝั่งออก (fabricouts) ให้ trim/COALESCE
-    //   - ตัดสต็อกเฉพาะที่มีคีย์ตัดชัดเจน (stockFabricStruct not null)
-    // =========================
+    // =====================================================
+    //   รวมสต็อกคงเหลือ = ยอดเข้า (stockfabrics) - ยอดออก (fabricouts)
+    //   ทำความสะอาดคีย์ด้วย TRIM/COALESCE และ GROUP BY ด้วย expression เดิม
+    //   + whereRaw(TRIM(...) <> '') กันค่าว่าง/ช่องว่างล้วน
+    // =====================================================
+
+    // ฝั่ง "เข้า"
     $ins = DB::table('stockfabrics')
         ->selectRaw("
             COALESCE(NULLIF(TRIM(customer), ''), 'AST') AS customer,
@@ -226,10 +223,21 @@ public function create()
             SUM(sumYard)        AS yards_in,
             MAX(createDate)     AS lastDate
         ")
-        ->whereNotNull('fabricStruct')->where('fabricStruct','<>','')
-        ->groupBy('customer','fabricStruct','fabricPattern','fabricW')
+        ->whereNotNull('fabricStruct')
+        ->whereRaw("TRIM(fabricStruct) <> ''")
+        ->whereNotNull('fabricPattern')
+        ->whereRaw("TRIM(fabricPattern) <> ''")
+        ->whereNotNull('fabricW')
+        ->whereRaw("TRIM(fabricW) <> ''")
+        ->groupByRaw("
+            COALESCE(NULLIF(TRIM(customer), ''), 'AST'),
+            TRIM(fabricStruct),
+            TRIM(fabricPattern),
+            TRIM(fabricW)
+        ")
         ->get();
 
+    // ฝั่ง "ออก" (ตัดจากสต็อก)
     $outs = DB::table('fabricouts')
         ->selectRaw("
             COALESCE(NULLIF(TRIM(stockCustomer), ''), 'AST') AS customer,
@@ -239,40 +247,69 @@ public function create()
             COUNT(fold)              AS folds_out,
             SUM(sumYard)             AS yards_out
         ")
-        ->whereNotNull('stockFabricStruct') // ตัดเฉพาะที่เลือกตัดจากสต็อกจริง
-        ->groupBy('customer','fabricStruct','fabricPattern','fabricW')
+        ->whereNotNull('stockFabricStruct')
+        ->whereRaw("TRIM(stockFabricStruct) <> ''")
+        ->whereNotNull('stockFabricPattern')
+        ->whereRaw("TRIM(stockFabricPattern) <> ''")
+        ->whereNotNull('stockFabricW')
+        ->whereRaw("TRIM(stockFabricW) <> ''")
+        ->groupByRaw("
+            COALESCE(NULLIF(TRIM(stockCustomer), ''), 'AST'),
+            TRIM(stockFabricStruct),
+            TRIM(stockFabricPattern),
+            TRIM(stockFabricW)
+        ")
         ->get();
 
-    $stockLots = $ins->map(function($in) use ($outs) {
-            $out = $outs->first(function($o) use ($in){
-                return $o->customer      === $in->customer
-                    && $o->fabricStruct  === $in->fabricStruct
-                    && $o->fabricPattern === $in->fabricPattern
-                    && $o->fabricW       === $in->fabricW;
-            });
+    // ทำดัชนีฝั่งออก เพื่อตามคีย์ได้เร็ว/แม่น
+    $outsIndex = [];
+    foreach ($outs as $o) {
+        $key = implode('|', [
+            $o->customer,
+            $o->fabricStruct,
+            $o->fabricPattern,
+            $o->fabricW
+        ]);
+        $outsIndex[$key] = $o;
+    }
 
-            $foldsOut = (int)($out->folds_out ?? 0);
-            $yardsOut = (float)($out->yards_out ?? 0);
+    // รวมคงเหลือ
+    $stockLots = collect($ins)->map(function ($in) use ($outsIndex) {
+        $key = implode('|', [
+            $in->customer,
+            $in->fabricStruct,
+            $in->fabricPattern,
+            $in->fabricW
+        ]);
 
-            return (object)[
-                'customer'        => $in->customer,
-                'fabricStruct'    => $in->fabricStruct,
-                'fabricPattern'   => $in->fabricPattern,
-                'fabricW'         => $in->fabricW,
-                'foldsIn'         => (int)$in->folds_in,
-                'yardsIn'         => (float)$in->yards_in,
-                'foldsOut'        => $foldsOut,
-                'yardsOut'        => $yardsOut,
-                'foldsRemaining'  => max(0, (int)$in->folds_in - $foldsOut),
-                'yardsRemaining'  => max(0, (float)$in->yards_in - $yardsOut),
-                'lastDate'        => $in->lastDate,
-            ];
-        })
-        ->filter(fn($r) => ($r->foldsRemaining > 0) || ($r->yardsRemaining > 0))
-        ->sortByDesc('yardsRemaining')
-        ->values();
+        $out = $outsIndex[$key] ?? null;
 
-    // ส่งค่าไปที่ view (สำคัญ: ต้องมี $stockLots เพื่อให้ dropdown “ตัดจากสต็อก” มีรายการ)
+        $foldsOut = (int)($out->folds_out ?? 0);
+        $yardsOut = (float)($out->yards_out ?? 0);
+
+        return (object)[
+            'customer'        => $in->customer,
+            'fabricStruct'    => $in->fabricStruct,
+            'fabricPattern'   => $in->fabricPattern,
+            'fabricW'         => $in->fabricW,
+            'foldsIn'         => (int)$in->folds_in,
+            'yardsIn'         => (float)$in->yards_in,
+            'foldsOut'        => $foldsOut,
+            'yardsOut'        => $yardsOut,
+            'foldsRemaining'  => max(0, (int)$in->folds_in - $foldsOut),
+            'yardsRemaining'  => max(0, (float)$in->yards_in - $yardsOut),
+            'lastDate'        => $in->lastDate,
+        ];
+    })
+    ->filter(fn ($r) => ($r->foldsRemaining > 0) || ($r->yardsRemaining > 0))
+    ->sortByDesc('yardsRemaining')
+    ->values();
+
+    // (ถ้าจำเป็น) เผยแพร่ตัวเลขสำหรับ debug ชั่วคราว
+    // \Log::info('stockLots_count', ['count' => $stockLots->count()]);
+    // \Log::info('ins_count', ['count' => $ins->count()]);
+    // \Log::info('outs_count', ['count' => $outs->count()]);
+
     return view('fabricout.create', compact(
         'customers','order_id','customer_name','fabric_struct',
         'orders','vatA','vatB','vatC','stockLots'
