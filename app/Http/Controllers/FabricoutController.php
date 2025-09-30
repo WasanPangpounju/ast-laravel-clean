@@ -198,6 +198,65 @@ public function create()
     $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
         ->whereIn('id', $ecp)->orderBy('customerName')->get();
 
+    $lastVat = Fabricout::groupBy('vatType')
+        ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
+        ->get();
+
+    $vatA='1001'; $vatB='1001'; $vatC='1001';
+    foreach ($lastVat as $v) {
+        if ($v->vatType==='A') $vatA = $v->max_no ? $v->max_no+1 : '1001';
+        if ($v->vatType==='B') $vatB = $v->max_no ? $v->max_no+1 : '1001';
+        if ($v->vatType==='C') $vatC = $v->max_no ? $v->max_no+1 : '1001';
+    }
+
+    $lastRecord = Fabricout::orderBy('no','DESC')->first();
+    $no = $lastRecord ? ($lastRecord->no + 1) : 1001;
+    if (!session()->has('no')) session()->put('no', $no);
+
+    $customers = Customer::orderBy('name')->get();
+
+    $order_id = '';
+    $customer_name = '';
+    $fabric_struct = '';
+
+    // ดึงรายการสต็อก (ชุดเดียวกับ dropdown)
+    $stockLots = $this->stockPickerOptions();
+
+    // ===== สำคัญ: ตั้งค่าที่จะใช้ preselect ด้วย fallback =====
+    $fg = session('fabricout_group', []);
+    $selStockCustomer = old('stockCustomer')
+        ?? ($fg['stockCustomer']      ?? (session('customerName') ?: 'AST'));
+    $selStockStruct   = old('stockFabricStruct')
+        ?? ($fg['stockFabricStruct']  ?? session('fabricStruct'));
+    $selStockPattern  = old('stockFabricPattern')
+        ?? ($fg['stockFabricPattern'] ?? session('fabricPattern'));
+    $selStockW        = old('stockFabricW')
+        ?? ($fg['stockFabricW']       ?? session('fabricW'));
+
+    return view('fabricout.create', compact(
+        'customers','order_id','customer_name','fabric_struct',
+        'orders','vatA','vatB','vatC',
+        'stockLots',
+        'selStockCustomer','selStockStruct','selStockPattern','selStockW'
+    ));
+}
+
+public function create_backup2()
+{
+    if ((int)session()->get('endCount', 0) <= 0) {
+        session()->forget([
+            'endCount','dt','customerName','receiveName','comment','receiveType','orderId',
+            'fabricStruct','fabricPattern','fabricW','customerReplace','fabricStructReplace',
+            'vatNo','vatType'
+        ]);
+    }
+
+    $ecp = FabricAststructure::select('purchaseOrder AS id')
+        ->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
+
+    $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
+        ->whereIn('id', $ecp)->orderBy('customerName')->get();
+
     // ใช้ DB::raw (ห้าม Fabricout::raw)
     $lastVat = Fabricout::groupBy('vatType')
         ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
