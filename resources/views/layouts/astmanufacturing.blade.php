@@ -120,7 +120,8 @@
                                 <a href="{{ route('fabricout.index') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>พิมพ์บิลส่งของ</p></a>
                             </li>
 
-                            
+                            {{-- ปิดเฉพาะเมนู “ตรวจสอบคีย์ผ้าเข้าสต็อก” --}}
+
                             <li class="nav-item">
                                 <a href="{{ route('inventory.index') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>ออร์เดอร์ลูกค้า</p></a>
                             </li>
