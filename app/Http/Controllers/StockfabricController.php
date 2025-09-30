@@ -20,7 +20,6 @@ class StockfabricController extends Controller
      */
     public function index()
     {
-        return 0;
         // Get combined data from both tables for initial view
         $combinedData = $this->getCombinedData();
         
