@@ -18,179 +18,268 @@
     <link rel="icon" href="{{ asset('assets/images/favicon.png') }}" type="image/png" sizes="16x16">
 
     <style>
-        #myUL { list-style-type: none; padding: 0; margin: 0; }
-        #myUL li { font-size: 14px !important; }
-        #myUL li a {
-            border: 1px solid #ddd; margin-top: -1px; background-color: #f6f6f6;
-            padding: 12px; text-decoration: none; font-size: 14px !important; color: black; display: block
-        }
-        #myUL li a:hover:not(.header) { background-color: #eee; }
-
-        #supp { list-style-type: none; padding: 0; margin: 0; }
-        #supp li { font-size: 14px !important; }
-        #supp li a {
-            border: 1px solid #ddd; margin-top: -1px; background-color: #f6f6f6;
-            padding: 12px; text-decoration: none; font-size: 14px !important; color: black; display: block
-        }
-        #supp li a:hover:not(.header) { background-color: #eee; }
-
-        #yarnty { list-style-type: none; padding: 0; margin: 0; }
-        #yarnty li a {
-            border: 1px solid #ddd; margin-top: -1px; background-color: #f6f6f6;
-            padding: 12px; text-decoration: none; font-size: 18px; color: black; display: block
-        }
-        #yarnty li a:hover:not(.header) { background-color: #eee; }
-
-        .yarntypeUL { list-style-type: none; padding: 0; margin: 0; }
-        .yarntypeUL li { font-size: 14px !important; }
-        .yarntypeUL li a {
-            border: 1px solid #ddd; margin-top: -1px; background-color: #f6f6f6;
-            padding: 12px; text-decoration: none; font-size: 14px !important; color: black; display: block
-        }
-        .yarntypeUL li a:hover:not(.header) { background-color: #eee; }
-
-        .searchsup { list-style-type: none; padding: 0; margin: 0; }
-        .searchsup li { font-size: 14px !important; }
-        .searchsup li a {
-            border: 1px solid #ddd; margin-top: -1px; background-color: #f6f6f6;
-            padding: 12px; text-decoration: none; font-size: 14px !important; color: black; display: block
-        }
-        .searchsup li a:hover:not(.header) { background-color: #eee; }
-
         .hidden { display: none; }
+        /* ของเก่าเรื่อง UL ต่าง ๆ เก็บไว้กรณีหน้าอื่นใช้ */
+        #myUL, #supp, .yarntypeUL, .searchsup { list-style-type:none; padding:0; margin:0; }
+        #myUL li, #supp li, .yarntypeUL li, .searchsup li { font-size:14px !important; }
+        #myUL li a, #supp li a, .yarntypeUL li a, .searchsup li a {
+            border:1px solid #ddd; margin-top:-1px; background:#f6f6f6; padding:12px;
+            text-decoration:none; font-size:14px !important; color:#000; display:block;
+        }
+        #myUL li a:hover, #supp li a:hover, .yarntypeUL li a:hover, .searchsup li a:hover { background:#eee; }
+        #yarnty { list-style-type:none; padding:0; margin:0; }
+        #yarnty li a {
+            border:1px solid #ddd; margin-top:-1px; background:#f6f6f6; padding:12px;
+            text-decoration:none; font-size:18px; color:#000; display:block;
+        }
+        #yarnty li a:hover { background:#eee; }
     </style>
 </head>
 
 <body class="hold-transition sidebar-mini">
-    <div class="wrapper">
+<div class="wrapper">
 
-        <!-- Top Navbar -->
-        <nav class="main-header navbar navbar-expand navbar-white navbar-light">
-            <!-- Left navbar links -->
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link" data-widget="pushmenu" href="#" role="button">
-                        <i class="fas fa-bars"></i>
-                    </a>
-                </li>
-            </ul>
+    <!-- Top Navbar -->
+    <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+        <!-- Left -->
+        <ul class="navbar-nav">
+            <li class="nav-item">
+                <a class="nav-link" data-widget="pushmenu" href="#" role="button">
+                    <i class="fas fa-bars"></i>
+                </a>
+            </li>
+        </ul>
 
-            <!-- Right navbar links -->
-            <ul class="navbar-nav ml-auto">
-                <!-- fullscreen -->
-                <li class="nav-item Fullscreen">
-                    <a class="nav-link" data-widget="fullscreen" href="#" role="button" style="letter-spacing: 1px;">
-                        ดูเต็มจอ <i class="fas fa-expand-arrows-alt"></i>
-                    </a>
-                </li>
+        <!-- Right -->
+        <ul class="navbar-nav ml-auto">
+            <li class="nav-item Fullscreen">
+                <a class="nav-link" data-widget="fullscreen" href="#" role="button" style="letter-spacing:1px;">
+                    ดูเต็มจอ <i class="fas fa-expand-arrows-alt"></i>
+                </a>
+            </li>
+            <li class="nav-item logout">
+                <a class="nav-link" href="#"
+                   onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                    ออกจากระบบ &nbsp;<img src="{{ asset('assets/images/arrow-right-from-bracket-solid.png') }}" width="17" alt="">
+                </a>
+                <form id="logout-form" action="/logout" method="POST" class="d-none">
+                    @csrf
+                </form>
+            </li>
+        </ul>
+    </nav>
 
-                <!-- logout (ตัด route('logout') ออกเพื่อไม่ให้ resolve route ตอนเรนเดอร์) -->
-                <li class="nav-item logout">
-                    <a class="nav-link" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                        ออกจากระบบ &nbsp;<img src="{{ asset('assets/images/arrow-right-from-bracket-solid.png') }}" width="17" alt="">
-                    </a>
-                    <form id="logout-form" action="/logout" method="POST" class="d-none">
-                        @csrf
-                    </form>
-                </li>
-            </ul>
-        </nav>
+    <!-- Sidebar -->
+    <aside class="main-sidebar sidebar-dark-primary elevation-4">
+        <!-- Brand -->
+        <a href="{{ url('/home') }}" class="brand-link">
+            <img src="{{ asset('assets/images/logo.png') }}" alt="Logo" class="brand-image">
+            <span class="brand-text font-weight-light">ASIA TEXTILE CO., LTD.</span>
+        </a>
 
-        <!-- Sidebar (เวอร์ชันเบา) -->
-        <aside class="main-sidebar sidebar-dark-primary elevation-4">
-            <!-- Brand Logo -->
-            <a href="#" class="brand-link">
-                <img src="{{ asset('assets/images/logo.png') }}" alt="Logo" class="brand-image">
-                <span class="brand-text font-weight-light">ASIA TEXTILE CO., LTD.</span>
-            </a>
-
-            <!-- Sidebar -->
-            <div class="sidebar">
-                <div class="user-panel mt-3 pb-3 mb-3 d-flex">
-                    <div class="image">
-                        <img src="{{ asset('assets/images/admin.jpg') }}" class="img-circle" alt="User Image">
-                    </div>
-                    <div class="info">
-                        @auth
-                            <a href="#" class="d-block">
-                                <p class="mb-0">{{ auth()->user()->name }}</p>
-                                <small>{{ auth()->user()->user_type }}</small>
-                            </a>
-                        @else
-                            <a href="#" class="d-block">ผู้ใช้งาน</a>
-                        @endauth
-                    </div>
+        <div class="sidebar">
+            <!-- User -->
+            <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+                <div class="image">
+                    <img src="{{ asset('assets/images/admin.jpg') }}" class="img-circle" alt="User Image">
                 </div>
+                <div class="info">
+                    @auth
+                        <a href="#" class="d-block">
+                            <p class="mb-0">{{ auth()->user()->name }}</p>
+                            <small>{{ auth()->user()->user_type }}</small>
+                        </a>
+                    @else
+                        <a href="#" class="d-block">ผู้ใช้งาน</a>
+                    @endauth
+                </div>
+            </div>
 
-                {{-- 
-                    ⚠ เมนูดั้งเดิมถูกปิดด้วย Blade comment เพื่อกันไม่ให้ Blade ประมวลผล route() ข้างใน
+            <!-- MENU: เปิดทุกระบบ ยกเว้น 'ระบบคลังสินค้า' -->
+            <nav class="mt-2">
+                <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
 
-                    <nav class="mt-2">
-                        <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+                    <!-- หน้าหลัก -->
+                    <li class="nav-item">
+                        <a href="{{ url('/home') }}" class="nav-link">
+                            <i class="nav-icon fas fa-tachometer-alt"></i>
+                            <p>หน้าหลัก</p>
+                        </a>
+                    </li>
+
+                    <!-- ระบบซื้อขาย -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-shopping-cart"></i>
+                            <p>ระบบซื้อขาย <i class="right fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
                             <li class="nav-item">
-                                <a href="/home" class="nav-link"><i class="nav-icon fas fa-tachometer-alt"></i><p>หน้าหลัก</p></a>
+                                <a href="{{ url('/customer') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>ข้อมูลลูกค้า</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/supplier') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>ข้อมูลซัพพลายเออร์</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/order/create') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>ใบคำสั่งขาย</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/order') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>ตรวจสอบใบสั่งขาย</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- ระบบคลังสินค้า (ปิดทั้งบล็อกนี้) -->
+                    {{--
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-folder"></i>
+                            <p>ระบบคลังสินค้า <i class="right fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item"><a href="{{ url('/inventory/create') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>คีย์ผ้าเข้าสต็อก</p></a></li>
+                            <li class="nav-item"><a href="{{ url('/fabricimport/create') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>คีย์ผ้าซื้อเข้า</p></a></li>
+                            <li class="nav-item"><a href="{{ url('/fabricout/create') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>เปิดบิลผ้า</p></a></li>
+                            <li class="nav-item"><a href="{{ url('/fabricout') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>พิมพ์บิลส่งของ</p></a></li>
+                            <li class="nav-item"><a href="{{ url('/fabriccheck') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>ตรวจสอบคีย์ผ้าเข้าสต็อก</p></a></li>
+                            <li class="nav-item"><a href="{{ url('/inventory') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>ออร์เดอร์ลูกค้า</p></a></li>
+                            <li class="nav-item"><a href="{{ url('/stockfabric') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>สต็อกผ้า</p></a></li>
+                            <li class="nav-item"><a href="{{ url('/fabricdeposit') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>สต็อกผ้าฝากจัดเก็บ</p></a></li>
+                        </ul>
+                    </li>
+                    --}}
+
+                    <!-- ระบบผลิตสินค้า (ยังไม่มีรายการย่อยในโค้ดเดิม — แสดงหัวข้อเฉย ๆ) -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-folder"></i>
+                            <p>ระบบผลิตสินค้า</p>
+                        </a>
+                    </li>
+
+                    <!-- วัตถุดิบ -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-shopping-cart"></i>
+                            <p>วัตถุดิบ <i class="right fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ url('/material') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>ตรวจสอบนำเข้าวัตถุดิบ</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/materialstore') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>ตรวจสอบเบิกวัตถุดิบออกภายใน</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/materialoutside') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>ตรวจสอบเบิกวัตถุดิบออกภายนอก</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/material/create') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>นำเข้าวัตถุดิบ</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/materialoutside/create') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>เบิกวัตถุดิบออกภายนอก</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/materialstore/create') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>เบิกวัตถุดิบออกภายใน</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ url('/package') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>คืนบรรจุภัณฑ์</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- ผู้ตรวจสอบ -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-user"></i>
+                            <p>ผู้ตรวจสอบ <i class="right fas fa-angle-left"></i></p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ url('/materialstock') }}" class="nav-link">
+                                    <i class="far fa-circle nav-icon"></i><p>สต๊อกวัตถุดิบ</p>
+                                </a>
                             </li>
                             <li class="nav-item">
                                 <a href="#" class="nav-link">
-                                    <i class="nav-icon fas fa-shopping-cart"></i>
-                                    <p>ระบบซื้อขาย <i class="right fas fa-angle-left"></i></p>
+                                    <i class="far fa-circle nav-icon"></i><p>ตรวจสอบคำสั่งซื้อ</p>
                                 </a>
-                                <ul class="nav nav-treeview">
-                                    <li class="nav-item">
-                                        <a href="{{ route('customer.index') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>ข้อมูลลูกค้า</p></a>
-                                    </li>
-                                    ...
-                                    <li class="nav-item">
-                                        <a href="{{ route('stockfabric.index') }}" class="nav-link"><i class="far fa-circle nav-icon"></i><p>สต็อกผ้า</p></a>
-                                    </li>
-                                    ...
-                                </ul>
                             </li>
-                            ...
                         </ul>
-                    </nav>
-                --}}
-            </div><!-- /.sidebar -->
-        </aside>
+                    </li>
 
-        <!-- Page content -->
-        @yield('content')
+                    <!-- ตั้งค่า -->
+                    <li class="nav-item">
+                        <a href="#" class="nav-link">
+                            <i class="nav-icon fas fa-cog"></i>
+                            <p>ตั้งค่า</p>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div><!-- /.sidebar -->
+    </aside>
 
-    </div><!-- /.wrapper -->
+    <!-- Page Content -->
+    @yield('content')
 
-    <footer class="main-footer">
-        Copyright © 2022 Asia Industrial Textile Co., Ltd. (AIT) All rights reserved.
-    </footer>
+</div><!-- /.wrapper -->
 
-    <!-- JS -->
-    <script src="{{ asset('assets/js/jquery.min.js') }}"></script>
-    <script src="{{ asset('assets/js/select2.full.min.js') }}"></script>
-    <script src="{{ asset('assets/js/moment.min.js') }}"></script>
-    <script src="{{ asset('assets/js/jquery.inputmask.min.js') }}"></script>
-    <script src="{{ asset('assets/js/daterangepicker.js') }}"></script>
-    <script src="{{ asset('assets/js/tempusdominus-bootstrap-4.min.js') }}"></script>
-    <script src="{{ asset('assets/js/adminlte.min.js') }}"></script>
+<footer class="main-footer">
+    Copyright © 2022 Asia Industrial Textile Co., Ltd. (AIT) All rights reserved.
+</footer>
 
-    <script>
-        $(function () {
-            // Datemask dd/mm/yyyy
-            $('#datemask').inputmask('dd/mm/yyyy', { 'placeholder': 'dd/mm/yyyy' });
-            $('#datemask2').inputmask('dd/mm/yyyy', { 'placeholder': 'dd/mm/yyyy' });
-            $('[data-mask]').inputmask();
+<!-- JS -->
+<script src="{{ asset('assets/js/jquery.min.js') }}"></script>
+<script src="{{ asset('assets/js/select2.full.min.js') }}"></script>
+<script src="{{ asset('assets/js/moment.min.js') }}"></script>
+<script src="{{ asset('assets/js/jquery.inputmask.min.js') }}"></script>
+<script src="{{ asset('assets/js/daterangepicker.js') }}"></script>
+<script src="{{ asset('assets/js/tempusdominus-bootstrap-4.min.js') }}"></script>
+<script src="{{ asset('assets/js/adminlte.min.js') }}"></script>
 
-            // Date picker
-            if (typeof $.fn.datetimepicker === 'function') {
-                $('#reservationdate').datetimepicker({ format: 'L' });
-            }
+<script>
+    $(function () {
+        // Datemask
+        $('#datemask').inputmask('dd/mm/yyyy', { 'placeholder': 'dd/mm/yyyy' });
+        $('#datemask2').inputmask('dd/mm/yyyy', { 'placeholder': 'dd/mm/yyyy' });
+        $('[data-mask]').inputmask();
+
+        // Date picker (ถ้ามี element)
+        if (typeof $.fn.datetimepicker === 'function') {
+            $('#reservationdate').datetimepicker({ format: 'L' });
+        }
+    });
+
+    // ไฮไลต์เมนู active
+    jQuery(function($){
+        var path = window.location.href;
+        $('ul li a').each(function() {
+            if (this.href === path) $(this).addClass('active');
         });
-
-        // ไฮไลต์เมนูที่ active (ตอนนี้เมนูหลักถูกปิดไว้ ฟังก์ชันนี้ไม่กระทบ)
-        jQuery(function($){
-            var path = window.location.href;
-            $('ul li a').each(function() {
-                if (this.href === path) $(this).addClass('active');
-            });
-        });
-    </script>
+    });
+</script>
 </body>
 </html>
