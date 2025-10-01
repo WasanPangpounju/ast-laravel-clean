@@ -13,7 +13,7 @@ use App\Http\Controllers\StuffController;
 use App\Http\Controllers\MaterialOutsideController;
 use App\Http\Controllers\ManufactureController;
 use App\Http\Controllers\InventoryController;
-use App\Http\Controllers\fabricimportController;
+use App\Http\Controllers\FabricimportController;
 use App\Http\Controllers\OrdershippedController;
 use App\Http\Controllers\StockfabricController;
 use App\Http\Controllers\FabricoutController;
