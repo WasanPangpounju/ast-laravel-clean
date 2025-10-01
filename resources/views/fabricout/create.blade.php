@@ -577,47 +577,11 @@
 
     {{-- ===== ซิงก์ตัวเลือก "ตัดจากสต็อก" -> hidden fields + ช่องค้นหา ===== --}}
     <script>
-    (function(){
-      const picker = document.getElementById('stockPicker');
-      const filter = document.getElementById('stockFilter');
-
-      const fC = document.getElementById('stockCustomer');
-      const fS = document.getElementById('stockFabricStruct');
-      const fP = document.getElementById('stockFabricPattern');
-      const fW = document.getElementById('stockFabricW');
-
-      function syncHiddenFromSelected(){
-        if (!picker) return;
-        const opt = picker.options[picker.selectedIndex];
-        if (!opt || !opt.dataset) return;
-        fC.value = opt.dataset.customer || '';
-        fS.value = opt.dataset.struct   || '';
-        fP.value = opt.dataset.pattern  || '';
-        fW.value = opt.dataset.w        || '';
-      }
-
-      function applyFilter(){
-        const q = (filter.value || '').toLowerCase().trim();
-        Array.from(picker.options).forEach((opt, idx) => {
-          if (idx === 0) return; // เว้น placeholder
-          const txt = (opt.text || '').toLowerCase();
-          opt.hidden = q && !txt.includes(q);
-        });
-      }
-
-      picker?.addEventListener('change', syncHiddenFromSelected);
-      filter?.addEventListener('input', applyFilter);
-
-      // sync ครั้งแรกตาม option ที่เลือกไว้ (ถ้ามี)
-      syncHiddenFromSelected();
-    })();
-    </script>
-
-    <script>
 (function(){
   const picker = document.getElementById('stockPicker');
+  const filter = document.getElementById('stockFilter');
 
-  // hidden fields (ต้องมีแค่ชุดเดียวบนหน้า)
+  // hidden fields (ให้มีชุดเดียวบนหน้า)
   const fC = document.getElementById('stockCustomer');
   const fS = document.getElementById('stockFabricStruct');
   const fP = document.getElementById('stockFabricPattern');
@@ -636,8 +600,7 @@
       : `สต็อกที่เลือกปัจจุบัน: <i>ยังไม่ได้เลือก</i>`;
   }
 
-  function syncFromSelected(){
-    const opt = picker?.options[picker.selectedIndex];
+  function setFromOption(opt){
     if (!opt) return;
     fC.value = opt.dataset.customer || '';
     fS.value = opt.dataset.struct   || '';
@@ -646,9 +609,48 @@
     renderCurrent();
   }
 
-  picker?.addEventListener('change', syncFromSelected);
-  syncFromSelected(); // ให้ตรงกับ option เริ่มต้นตอนโหลดหน้า
+  // เลือก option แรกที่ "มองเห็นได้" และมี value (ข้าม placeholder)
+  function pickFirstVisible(){
+    if (!picker) return;
+    const first = Array.from(picker.options).find((o, idx) => idx > 0 && !o.hidden && o.value);
+    if (first) {
+      first.selected = true;
+      setFromOption(first);
+    } else {
+      // ไม่มีตัวเลือก -> เคลียร์ค่า
+      fC.value = fS.value = fP.value = fW.value = '';
+      renderCurrent();
+    }
+  }
+
+  function onChange(){
+    const opt = picker.options[picker.selectedIndex];
+    if (opt && opt.value) setFromOption(opt);
+    else pickFirstVisible();
+  }
+
+  function applyFilter(){
+    const q = (filter?.value || '').toLowerCase().trim();
+    Array.from(picker.options).forEach((opt, idx) => {
+      if (idx === 0) return; // ข้าม placeholder
+      const txt = (opt.textContent || opt.innerText || '').toLowerCase();
+      opt.hidden = q && !txt.includes(q);
+    });
+    // หลังกรองให้มีตัวที่ถูกเลือกเสมอ
+    pickFirstVisible();
+  }
+
+  picker?.addEventListener('change', onChange);
+  filter?.addEventListener('input', applyFilter);
+
+  // === init: กรณีเข้าเพจตรง ๆ ให้เลือกตัวแรกให้อัตโนมัติ ===
+  if (picker) {
+    const opt = picker.options[picker.selectedIndex];
+    if (!opt || !opt.value) pickFirstVisible();
+    else setFromOption(opt);
+  }
 })();
 </script>
+
 
 @endsection
