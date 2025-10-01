@@ -576,11 +576,11 @@
   const picker = document.getElementById('stockPicker');
   const filter = document.getElementById('stockFilter');
 
-  // hidden fields (ให้มีชุดเดียวบนหน้า)
-  const fC = document.getElementById('stockCustomer');
-  const fS = document.getElementById('stockFabricStruct');
-  const fP = document.getElementById('stockFabricPattern');
-  const fW = document.getElementById('stockFabricW');
+  // จับ hidden ด้วย name เพื่อกันกรณีเผลอมี id ซ้ำ
+  const fC = document.querySelector('input[name="stockCustomer"]');
+  const fS = document.querySelector('input[name="stockFabricStruct"]');
+  const fP = document.querySelector('input[name="stockFabricPattern"]');
+  const fW = document.querySelector('input[name="stockFabricW"]');
 
   const currentEl = document.getElementById('stockCurrentDisplay');
 
@@ -597,23 +597,25 @@
 
   function setFromOption(opt){
     if (!opt) return;
-    fC.value = opt.dataset.customer || '';
-    fS.value = opt.dataset.struct   || '';
-    fP.value = opt.dataset.pattern  || '';
-    fW.value = opt.dataset.w        || '';
+    if (fC) fC.value = opt.dataset.customer || '';
+    if (fS) fS.value = opt.dataset.struct   || '';
+    if (fP) fP.value = opt.dataset.pattern  || '';
+    if (fW) fW.value = opt.dataset.w        || '';
     renderCurrent();
   }
 
-  // เลือก option แรกที่ "มองเห็นได้" และมี value (ข้าม placeholder)
+  // เลือก option แรกที่มองเห็นได้ (ข้าม placeholder) สำหรับกรณีเข้าเพจตรง ๆ
   function pickFirstVisible(){
     if (!picker) return;
-    const first = Array.from(picker.options).find((o, idx) => idx > 0 && !o.hidden && o.value);
+    const first = Array.from(picker.options).find((o, i) => i > 0 && !o.hidden && o.value);
     if (first) {
-      first.selected = true;
+      picker.value = first.value;
       setFromOption(first);
     } else {
-      // ไม่มีตัวเลือก -> เคลียร์ค่า
-      fC.value = fS.value = fP.value = fW.value = '';
+      if (fC) fC.value = '';
+      if (fS) fS.value = '';
+      if (fP) fP.value = '';
+      if (fW) fW.value = '';
       renderCurrent();
     }
   }
@@ -631,21 +633,21 @@
       const txt = (opt.textContent || opt.innerText || '').toLowerCase();
       opt.hidden = q && !txt.includes(q);
     });
-    // หลังกรองให้มีตัวที่ถูกเลือกเสมอ
     pickFirstVisible();
   }
 
   picker?.addEventListener('change', onChange);
   filter?.addEventListener('input', applyFilter);
 
-  // === init: กรณีเข้าเพจตรง ๆ ให้เลือกตัวแรกให้อัตโนมัติ ===
+  // init: ถ้าไม่ได้เลือกอะไรไว้ ให้เลือกตัวแรกที่มองเห็น
   if (picker) {
-    const opt = picker.options[picker.selectedIndex];
-    if (!opt || !opt.value) pickFirstVisible();
-    else setFromOption(opt);
+    const sel = picker.options[picker.selectedIndex];
+    if (!sel || !sel.value) pickFirstVisible();
+    else setFromOption(sel);
   }
 })();
 </script>
+
 
 
 @endsection
