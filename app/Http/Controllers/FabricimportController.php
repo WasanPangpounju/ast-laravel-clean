@@ -76,7 +76,7 @@ class FabricimportController extends Controller
 
         // print_r($orders->fabricId);
 
-        return view('fabricimport.index', compact('orders', 'inventorydata', 'fabricoutdata', 'fabricoutdata2'));
+        // return view('fabricimport.index', compact('orders', 'inventorydata', 'fabricoutdata', 'fabricoutdata2'));
     }
 
     /**
