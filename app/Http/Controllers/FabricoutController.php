@@ -528,10 +528,14 @@ public function create_backup1()
         $stockFabricStruct = stockfabric::groupBy(['fabricStruct','fabricPattern','fabricW'])
             ->selectRaw('fabricStruct, fabricPattern, fabricW, COUNT(fold) as foldCount, SUM(sumYard) as sumYardSum, MAX(createDate) as lastDate')
             ->get();
+// xx
+    // 👉 เปลี่ยนมาใช้ตัวเลือกแบบเบาเครื่อง
+$stockLots = $this->stockPickerOptions();
 
         return view('fabricout.create', compact(
             'customers','order_id','customer_name','fabric_struct',
-            'orders','stockFabricStruct','vatA','vatB','vatC'
+            'orders','stockFabricStruct','vatA','vatB','vatC',
+            stockLots'
         ));
     }
 
