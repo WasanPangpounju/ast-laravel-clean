@@ -22,7 +22,7 @@ use Codedge\Fpdf\Fpdf\Fpdf;
 
 use Carbon\Carbon;
 
-class InventoryController extends Controller
+class FabricimportController extends Controller
 {
 
     public function __construct()
