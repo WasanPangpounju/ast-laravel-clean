@@ -56,7 +56,7 @@ Route::resource('stuff', StuffController::class );
 Route::resource('materialoutside', MaterialOutsideController::class );
 Route::resource('manufacture', ManufactureController::class );
 Route::resource('inventory', InventoryController::class );
-Route::resource('fabricimport', InventoryController::class );
+Route::resource('fabricimport', FabricimportController::class );
 Route::resource('ordershipped', OrdershippedController::class );
 Route::resource('stockfabric', StockfabricController::class );
 Route::resource('fabricout', FabricoutController::class );
