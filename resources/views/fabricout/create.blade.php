@@ -572,11 +572,11 @@
 
     {{-- ===== ซิงก์ตัวเลือก "ตัดจากสต็อก" -> hidden fields + ช่องค้นหา ===== --}}
     <script>
-(function(){
+document.addEventListener('DOMContentLoaded', function(){
   const picker = document.getElementById('stockPicker');
   const filter = document.getElementById('stockFilter');
 
-  // จับ hidden ด้วย name เพื่อกันกรณีเผลอมี id ซ้ำ
+  // เลี่ยงปัญหา id ซ้ำ: อ้างด้วย name
   const fC = document.querySelector('input[name="stockCustomer"]');
   const fS = document.querySelector('input[name="stockFabricStruct"]');
   const fP = document.querySelector('input[name="stockFabricPattern"]');
@@ -604,48 +604,44 @@
     renderCurrent();
   }
 
-  // เลือก option แรกที่มองเห็นได้ (ข้าม placeholder) สำหรับกรณีเข้าเพจตรง ๆ
-  function pickFirstVisible(){
-    if (!picker) return;
-    const first = Array.from(picker.options).find((o, i) => i > 0 && !o.hidden && o.value);
-    if (first) {
-      picker.value = first.value;
-      setFromOption(first);
-    } else {
-      if (fC) fC.value = '';
-      if (fS) fS.value = '';
-      if (fP) fP.value = '';
-      if (fW) fW.value = '';
-      renderCurrent();
-    }
+  function firstVisible(){
+    return Array.from(picker.options).find((o,i)=> i>0 && !o.hidden && o.value);
   }
 
   function onChange(){
-    const opt = picker.options[picker.selectedIndex];
-    if (opt && opt.value) setFromOption(opt);
-    else pickFirstVisible();
+    setFromOption(picker.options[picker.selectedIndex]);
   }
 
-  function applyFilter(){
+  function onFilter(){
     const q = (filter?.value || '').toLowerCase().trim();
     Array.from(picker.options).forEach((opt, idx) => {
       if (idx === 0) return; // ข้าม placeholder
       const txt = (opt.textContent || opt.innerText || '').toLowerCase();
       opt.hidden = q && !txt.includes(q);
     });
-    pickFirstVisible();
+    // ให้ selection ปัจจุบันยัง valid
+    if (!picker.value || picker.options[picker.selectedIndex].hidden) {
+      const fv = firstVisible();
+      picker.value = fv ? fv.value : '';
+      setFromOption(fv);
+    }
   }
 
   picker?.addEventListener('change', onChange);
-  filter?.addEventListener('input', applyFilter);
+  filter?.addEventListener('input', onFilter);
 
-  // init: ถ้าไม่ได้เลือกอะไรไว้ ให้เลือกตัวแรกที่มองเห็น
+  // init: เข้าเพจตรง ๆ ถ้ายังไม่เลือก ให้เลือกตัวแรกที่มองเห็นได้
   if (picker) {
-    const sel = picker.options[picker.selectedIndex];
-    if (!sel || !sel.value) pickFirstVisible();
-    else setFromOption(sel);
+    if (!picker.value || picker.selectedIndex <= 0) {
+      const fv = firstVisible();
+      picker.value = fv ? fv.value : '';
+      setFromOption(fv);
+    } else {
+      setFromOption(picker.options[picker.selectedIndex]);
+    }
   }
-})();
+  renderCurrent();
+});
 </script>
 
 
