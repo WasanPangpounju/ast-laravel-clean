@@ -175,14 +175,9 @@
 
                                     @if(!empty($selStockStruct))
                                     <small id="stockCurrentDisplay" class="text-muted d-block mt-1">
-  @if(!empty($selStockStruct))
-    สต็อกที่เลือกปัจจุบัน:
-    <b>[{{ $selStockCustomer }}]</b>
-    {{ $selStockStruct }} | {{ $selStockPattern }} | {{ $selStockW }}''
-  @else
-    สต็อกที่เลือกปัจจุบัน: <i>ยังไม่ได้เลือก</i>
-  @endif
+  สต็อกที่เลือกปัจจุบัน: <i>ยังไม่ได้เลือก</i>
 </small>
+
 
                                     @endif
                                 </div>
