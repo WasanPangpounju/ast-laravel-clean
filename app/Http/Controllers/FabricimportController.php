@@ -144,7 +144,7 @@ class InventoryController extends Controller
         // ->orderBy('createDate', 'desc')
         // ->get();
         // return view('inventory.create', compact('orders','customers','orders123'));
-        return view('inventory.create', compact('orders', 'customers'));
+        return view('Fabricimport.create', compact('orders', 'customers'));
     }
 
     /**
