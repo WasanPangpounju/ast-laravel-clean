@@ -218,11 +218,11 @@
                                     <input type="hidden" name="comment"      value="<?php print $comment; ?>">
 
                                     {{-- hidden ซ้ำให้แน่ใจว่า key สต็อกถูกส่ง --}}
-                                    <input type="hidden" id="stockCustomer"      name="stockCustomer"      value="{{ $selStockCustomer }}">
+                                    {{-- <input type="hidden" id="stockCustomer"      name="stockCustomer"      value="{{ $selStockCustomer }}">
                                     <input type="hidden" id="stockFabricStruct"  name="stockFabricStruct"  value="{{ $selStockStruct }}">
                                     <input type="hidden" id="stockFabricPattern" name="stockFabricPattern" value="{{ $selStockPattern }}">
                                     <input type="hidden" id="stockFabricW"       name="stockFabricW"       value="{{ $selStockW }}">
-
+--}}
                                 <?php print("</div>"); } else { ?>
 
                                     <input type="hidden" name="orderId" value="<?php print $order_id; ?>">
