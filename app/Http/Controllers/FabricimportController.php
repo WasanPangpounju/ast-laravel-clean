@@ -76,7 +76,7 @@ class FabricimportController extends Controller
 
         // print_r($orders->fabricId);
 
-        return view('inventory.index', compact('orders', 'inventorydata', 'fabricoutdata', 'fabricoutdata2'));
+        return view('fabricimport.index', compact('orders', 'inventorydata', 'fabricoutdata', 'fabricoutdata2'));
     }
 
     /**
@@ -143,8 +143,8 @@ class FabricimportController extends Controller
         // // ->orderBy('created_at', 'desc')
         // ->orderBy('createDate', 'desc')
         // ->get();
-        return view('fabricimport.create', compact('orders','customers','orders123'));
-        // return view('fabricimport.create', compact('orders', 'customers'));
+        // return view('fabricimport.create', compact('orders','customers','orders123'));
+        return view('fabricimport.create', compact('orders', 'customers'));
     }
 
     /**
