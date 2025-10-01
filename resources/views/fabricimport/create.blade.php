@@ -14,7 +14,6 @@
         }
     </style>
 
-    <!-- Content Wrapper. Contains page content -->
     <div class="content-wrapper">
         <div class="">
             <ol class="breadcrumb">
@@ -25,7 +24,6 @@
                 <li class="breadcrumb-item active">คีย์ผ้าเข้าสต็อก</li>
             </ol>
         </div>
-        <!-- Content Header (Page header) -->
         <div class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
@@ -33,7 +31,6 @@
                 </div>
             </div>
         </div>
-        <!-- Main content -->
         <div class="content">
             <div class="box-from">
 
@@ -51,11 +48,18 @@
                     } else {
                         $c = 0;
                     }
+                    // ดึงข้อมูลใหม่จาก Session
+                    $supplierName = session()->get('supplierName') ?? '';
+                    $invoiceNo = session()->get('invoiceNo') ?? '';
+                    $unitPrice = session()->get('unitPrice') ?? '';
+                    $dyeLot = session()->get('dyeLot') ?? '';
+                    $location = session()->get('location') ?? '';
                     ?>
 
 
                     <div class="container">
                         <div class="row">
+                            {{-- แถบเมนู (ไม่ได้แก้ไข) --}}
                             <div class="col-md-3">
                                 <button class="btn b_order" type="button"
                                     style="width: 60%;margin:0.5rem;background-color: #ebd575;"><a
@@ -88,15 +92,18 @@
                             </div>
                         </div>
                     </div>
+
+                    {{-- -------------------------------------------------------------------------------- --}}
+                    {{-- ส่วนการกรอกข้อมูลหลัก (ถูกจัดเรียงใหม่เป็น 2 คอลัมน์) --}}
                     <div class="container">
                         <div class="row">
+                            
+                            {{-- COLUMN 1: ข้อมูลผ้าและลูกค้า (ข้อมูลเดิม) --}}
                             <div class="col-md-4">
-                                <p>จำนวนรวม : <strong id="fabriccount"></strong> พับ <strong id="sum"></strong> หลา
-                                </p>
-                                <input type="hidden" id="emp" name="emp" value="{{ Auth::user()->name }}">
-                                <?php
+                                <p>จำนวนรวม : <strong id="fabriccount"></strong> พับ <strong id="sum"></strong> หลา</p>
                                 
-                                //check create date from session
+                                {{-- โค้ด PHP/Blade เดิมสำหรับแสดงข้อมูลหลักที่เก็บใน Session --}}
+                                <?php
                                 if (session()->has('dt')) {
                                     $dt = session()->get('dt');
                                 } else {
@@ -131,52 +138,37 @@
                                 } else {
                                     $fabricId = '';
                                 }
-                                
                                 ?>
-                                <?php if ($dt != '' && $fabricStruct != ''&& $fabricW != '') {
+                                
+                                {{-- ถ้ามีข้อมูลใน Session ให้แสดงข้อมูลและซ่อนฟอร์ม --}}
+                                <?php if ($dt != '' && $fabricStruct != '' && $fabricW != '') {
                                     print($date = date('d/m/Y', strtotime($dt)));
-                                    print($fabricId.'<br>');
+                                    print($fabricId . '<br>');
                                     print($fabricStruct);
-                             print($fabricPattern );
+                                    print($fabricPattern);
                                     print($fabricW);
                                     print($customer);
-                                        ?>
-                                <input type="hidden" name="dt" class="form-control" value="<?php print $dt; ?>">
-                                <input type="hidden" name="fabricStruct" class="form-control" value="<?php print $fabricStruct; ?>">
-                                <input type="hidden" name="fabricPattern" class="form-control" value="<?php print $fabricPattern; ?>">
-                                <input type="hidden" name="fabricW" class="form-control" value="<?php print $fabricW; ?>">
-                                <input type="hidden" name="customer" class="form-control" value="<?php print $customer; ?>">
-                                <input type="hidden" name="fabricId" class="form-control" value="<?php print $fabricId; ?>">
+                                    ?>
+                                    <input type="hidden" name="dt" class="form-control" value="<?php print $dt; ?>">
+                                    <input type="hidden" name="fabricStruct" class="form-control" value="<?php print $fabricStruct; ?>">
+                                    <input type="hidden" name="fabricPattern" class="form-control" value="<?php print $fabricPattern; ?>">
+                                    <input type="hidden" name="fabricW" class="form-control" value="<?php print $fabricW; ?>">
+                                    <input type="hidden" name="customer" class="form-control" value="<?php print $customer; ?>">
+                                    <input type="hidden" name="fabricId" class="form-control" value="<?php print $fabricId; ?>">
+                                    
+                                    {{-- Hidden Fields สำหรับข้อมูลซื้อเข้าใหม่ที่มาจาก Session --}}
+                                    <input type="hidden" name="supplierName" class="form-control" value="{{ $supplierName }}">
+                                    <input type="hidden" name="invoiceNo" class="form-control" value="{{ $invoiceNo }}">
+                                    <input type="hidden" name="unitPrice" class="form-control" value="{{ $unitPrice }}">
+                                    <input type="hidden" name="dyeLot" class="form-control" value="{{ $dyeLot }}">
+                                    <input type="hidden" name="location" class="form-control" value="{{ $location }}">
 
-                                <?php }else{ ?>
+                                {{-- ถ้าไม่มีข้อมูลใน Session ให้แสดงฟอร์มกรอกข้อมูลหลัก --}}
+                                <?php } else { ?>
 
                                 <div class="form-group">
-                                    <label for="createDate">วันที่</label>
-
-                                    {{-- @if (isset($backdata))
-                                        <div class="input-group date" id="reservationdate" data-target-input="nearest">
-                                            <input type="text" name="createDate"
-                                                class="form-control datetimepicker-input" data-target="#reservationdate"
-                                                value="{{ $backdata->createDate }} " />
-                                            <div class="input-group-append" data-target="#reservationdate"
-                                                data-toggle="datetimepicker">
-                                                <div class="input-group-text"><i class="fa fa-calendar"></i></div>
-                                            </div>
-                                        </div>
-                                </div>
-                            @else
-                                <div class="input-group date" id="reservationdate" data-target-input="nearest">
-                                    <input type="text" name="createDate" class="form-control datetimepicker-input"
-                                        data-target="#reservationdate" value="{{ $dt }}" />
-                                    <div class="input-group-append" data-target="#reservationdate"
-                                        data-toggle="datetimepicker">
-                                        <div class="input-group-text"><i class="fa fa-calendar"></i></div>
-                                    </div>
-                                </div>
-                            </div>
-                            @endif --}}
-
-                                    <input class="date form-control" type="text" name="dt" autocomplete="off">
+                                    <label for="dt">วันที่</label>
+                                    <input class="date form-control" type="text" name="dt" autocomplete="off" required>
                                 </div>
                                 <script type="text/javascript">
                                     $('.date').datepicker({
@@ -184,127 +176,45 @@
                                         orientation: "bottom",
                                     });
                                 </script>
+                                
                                 <div class="form-group">
                                     <label for="fabricId">รหัสผ้า </label>
-                                    @if (isset($backdata))
-                                        <input type="text" onkeyup="fabricIdFunction('fabricId')" name="fabricId"
-                                            class="form-control" id="fabricId" placeholder="รหัสผ้า" autocomplete="off"
-                                            value="{{ $backdata->fabricId }}">
-                                    @else
-                                        <input type="text" name="fabricId" onkeyup="fabricIdFunction('fabricId')"
-                                            list="brow" id="fabricIdInput" class="form-control" autocomplete="off"
-                                            placeholder="รหัสผ้า">
-                                        <datalist id="brow">
-                                            @foreach ($orders as $stockFS)
-                                                <option
-                                                    value="{{ $stockFS->fabricId }},{{ $stockFS->fabricStructure }},{{ $stockFS->fabricPattern }},{{ $stockFS->fabric_w }}">
-                                            @endforeach
-                                        </datalist>
-                                    @endif
-
+                                    <input type="text" name="fabricId" onkeyup="fabricIdFunction('fabricId')"
+                                        list="brow" id="fabricIdInput" class="form-control" autocomplete="off"
+                                        placeholder="รหัสผ้า" required>
+                                    <datalist id="brow">
+                                        @foreach ($orders as $stockFS)
+                                            <option
+                                                value="{{ $stockFS->fabricId }},{{ $stockFS->fabricStructure }},{{ $stockFS->fabricPattern }},{{ $stockFS->fabric_w }}">
+                                        @endforeach
+                                    </datalist>
                                 </div>
 
                                 <div class="form-group">
                                     <label for="fabricStruct">โครงสร้างผ้า </label>
-                                    @if (isset($backdata))
-                                        <input type="text" name="fabricStruct" {{-- onkeyup="supplierFunction('fabricStruct')" --}}
-                                            class="form-control" id="fabricStructureInput" placeholder="โครงสร้างผ้า"
-                                            value="{{ $backdata->fabricStruct }}">
-                                    @else
-                                        <input type="text" name="fabricStruct" {{-- onkeyup="supplierFunction('fabricStruct')"  --}}
-                                            class="form-control" id="fabricStructureInput" placeholder="โครงสร้างผ้า"
-                                            value="{{ $fabricStruct }}" required>
-                                    @endif
-
-                                    {{-- <ul id="supp">
-                                    @foreach ($orders as $order)
-                                        <li><a
-                                                href="javascript:setsupplierFunction('supp', '{{ $order->fabricStructure }}' , '{{ $order->fabricPattern }}');">{{ $order->fabricStructure }}
-                                                {{ $order->fabricPattern }}</a>
-                                        </li>
-                                    @endforeach
-                                </ul> --}}
-                                    {{-- <ul id="supp">
-                                        @foreach ($orders as $stockFS)
-                                            <li><a
-                                                    href="javascript:setsupplierFunction('supp', '{{ $stockFS->fabricStructure }}' , '{{ $stockFS->fabricPattern }}' , '{{ $stockFS->fabric_w }}');">{{ $stockFS->fabricStructure }}
-                                                    {{ $stockFS->fabricPattern }} หน้ากว้าง {{ $stockFS->fabric_w }}
-                                                    '</a>
-                                            </li>
-                                        @endforeach
-                                    </ul> --}}
-
+                                    <input type="text" name="fabricStruct" class="form-control" id="fabricStructureInput" placeholder="โครงสร้างผ้า" value="{{ $fabricStruct }}" required>
                                 </div>
 
                                 <div class="form-group">
                                     <label for="fabricPattern">ลายผ้า </label>
-                                    @if (isset($backdata))
-                                        <input type="text" name="fabricPattern" class="form-control"
-                                            id="fabricPatternInput" placeholder=""
-                                            value="{{ $backdata->fabricPattern }}">
-                                    @else
-                                        <input type="text" name="fabricPattern" class="form-control"
-                                            id="fabricPatternInput" placeholder="ลายผ้า" value="{{ $fabricPattern }}"
-                                            required>
-                                    @endif
-
+                                    <input type="text" name="fabricPattern" class="form-control" id="fabricPatternInput" placeholder="ลายผ้า" value="{{ $fabricPattern }}" required>
                                 </div>
 
                                 <div class="form-group">
                                     <label for="fabricW">หน้ากว้าง </label>
-
-                                    @if (isset($backdata))
-                                        <input type="text" name="fabricW" class="form-control" id="fabricWidthInput"
-                                            placeholder="หน้ากว้าง" value="{{ $backdata->fabricW }}" required>
-                                    @else
-                                        <input type="text" name="fabricW" class="form-control" id="fabricWidthInput"
-                                            placeholder="หน้ากว้าง" value="{{ $fabricW }} " required>
-                                    @endif
-
+                                    <input type="text" name="fabricW" class="form-control" id="fabricWidthInput" placeholder="หน้ากว้าง" value="{{ $fabricW }} " required>
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="customer">ลูกค้า </label>
-
-                                    @if (isset($backdata))
-                                        <input type="text" name="customer" list="brow2" id="customer"
-                                            class="form-control" id="customer" placeholder="customer"
-                                            value="{{ $backdata->fabricW }}">
-                                        <datalist id="brow2">
-                                            @foreach ($customers as $customer)
-                                                <option value="{{ $customer->name }}">
-                                            @endforeach
-
-                                        </datalist>
-                                    @else
-                                        <input type="text" name="customer" list="brow2" id="customer"
-                                            class="form-control" id="customer" placeholder="customer">
-                                        <datalist id="brow2">
-                                            @foreach ($customers as $customer)
-                                                <option value="{{ $customer->name }}">
-                                            @endforeach
-                                        </datalist>
-                                    @endif
-
+                                    <label for="customer">ลูกค้า (หากเป็นผ้าฝากผลิต)</label>
+                                    <input type="text" name="customer" list="brow2" id="customerInput" class="form-control" placeholder="ลูกค้า" value="{{ $customer }}">
+                                    <datalist id="brow2">
+                                        @foreach ($customers as $customer)
+                                            <option value="{{ $customer->name }}">
+                                        @endforeach
+                                    </datalist>
                                 </div>
-
-                                {{-- <input type="text" name="fabricId" onkeyup="fabricIdFunction('fabricId')"
-                                    list="brow" id="fabricIdInput" class="form-control"
-                                    placeholder="fabric structure">
-                                <datalist id="brow">
-                                    @foreach ($orders as $stockFS)
-                                        <option
-                                            value="รหัสผ้า{{ $stockFS->fabricId }},โครงสร้าง{{ $stockFS->fabricStructure }},ลายผ้า{{ $stockFS->fabricPattern }},หน้ากว้าง{{ $stockFS->fabric_w }}">
-                                    @endforeach
-                                </datalist> --}}
-
-                                {{-- <input type="text" name="fabricStructure" id="fabricStructureInput"
-                                    class="form-control" placeholder="fabric structure">
-                                <input type="text" name="fabricPattern" id="fabricPatternInput" class="form-control"
-                                    placeholder="fabric pattern">
-                                <input type="text" name="fabricWidth" id="fabricWidthInput" class="form-control"
-                                    placeholder="fabric width"> --}}
-
+                                
                                 <script>
                                     function fabricIdFunction(attribute) {
                                         const inputElement = document.getElementById("fabricIdInput");
@@ -327,105 +237,109 @@
                                     }
                                 </script>
 
-                                {{-- @foreach ($orders as $order)
-                                    {{ $order->fabricId }} <br>
-                                @endforeach --}}
-
-
-
                                 <?php } ?>
                             </div>
-                            <!-- Your input fields go here -->
-                            @for ($i = 0; $i < 8; $i++)
-                                <div class="col-md-1" style="margin: -0.5em;">
-                                    @for ($k = 0; $k < 20; $k++)
-                                        <div class="form-group">
-                                            @php
-                                                $j = $i * 20 + $k + $c;
-                                                $l = $i * 20 + $k;
-                                                
-                                                $inputId = 'sumYard' . ($l + 1);
-                                            @endphp
-                                            <label for="sumYard{{ $j + 1 }}"></label>
-                                            <div>
-                                                <div
-                                                    style="background-color: rgb(255, 238, 0); margin-bottom: -1.5rem; text-align: center; margin-right: 2.5rem;">
-                                                    {{ $j + 1 }}
-                                                </div>
-                                                <input type="number" name="sumYard[{{ $j + 1 }}]" maxlength="3"
-                                                    class="input-text" id="{{ $inputId }}"
-                                                    style="width: 50%; font-size: 14pt; font-weight: bold; float: right;"
-                                                    autocomplete="off">
-                                            </div>
-                                        </div>
-                                    @endfor
-                                    <p id="show{{ $i + 1 }}"
-                                        style="background-color: rgb(255, 238, 0);margin-top: 2rem;">
-                                        รวมแถวที่ {{ $i + 1 }}</p>
+                            
+                            {{-- -------------------------------------------------------------------------------- --}}
+                            
+                            {{-- COLUMN 2: ข้อมูลการซื้อเข้าใหม่ (Supplier, Invoice, Price, Lot) 🏭💵 --}}
+                            <div class="col-md-4">
+                                <h4 class="mt-4 mb-3" style="color: #007bff;"><i class="fas fa-warehouse"></i> ข้อมูลการซื้อเข้า</h4>
+                                
+                                <div class="form-group">
+                                    <label for="supplierName">ชื่อผู้ขาย / โรงงาน 🏭 <span class="text-danger">*</span></label>
+                                    <input type="text" name="supplierName" class="form-control" id="supplierNameInput" 
+                                           placeholder="ผู้ขายผ้า" value="{{ $supplierName }}" required>
+                                </div>
 
+                                <div class="form-group">
+                                    <label for="invoiceNo">เลขที่บิล / ใบส่งของ 📄 <span class="text-danger">*</span></label>
+                                    <input type="text" name="invoiceNo" class="form-control" id="invoiceNoInput" 
+                                           placeholder="เลขที่เอกสารซื้อเข้า" value="{{ $invoiceNo }}" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="unitPrice">ราคาซื้อต่อหลา 💵</label>
+                                    <input type="number" step="0.01" name="unitPrice" class="form-control" id="unitPriceInput" 
+                                           placeholder="0.00" value="{{ $unitPrice }}">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="dyeLot">ล็อตย้อม/การผลิต (Dye Lot) 🧪</label>
+                                    <input type="text" name="dyeLot" class="form-control" id="dyeLotInput" 
+                                           placeholder="Lot A, B, C..." value="{{ $dyeLot }}">
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="location">ตำแหน่งจัดเก็บ (Location) 📍</label>
+                                    <input type="text" name="location" class="form-control" id="locationInput" 
+                                           placeholder="A1, B2/3" value="{{ $location }}">
+                                </div>
+                            </div>
+                            
+                            {{-- -------------------------------------------------------------------------------- --}}
+
+                            <div class="col-md-4">
+                                {{-- ส่วนนี้เว้นไว้สำหรับ Layout ที่สวยงาม --}}
+                            </div>
+
+                        </div>
+                    </div>
+                    {{-- -------------------------------------------------------------------------------- --}}
+                    
+                    
+                    {{-- Your input fields go here (ส่วนการกรอกจำนวนหลาแต่ละพับ) --}}
+                    @for ($i = 0; $i < 8; $i++)
+                        <div class="col-md-1" style="margin: -0.5em;">
+                            @for ($k = 0; $k < 20; $k++)
+                                <div class="form-group">
+                                    @php
+                                        $j = $i * 20 + $k + $c;
+                                        $l = $i * 20 + $k;
+                                        
+                                        $inputId = 'sumYard' . ($l + 1);
+                                    @endphp
+                                    <label for="sumYard{{ $j + 1 }}"></label>
+                                    <div>
+                                        <div
+                                            style="background-color: rgb(255, 238, 0); margin-bottom: -1.5rem; text-align: center; margin-right: 2.5rem;">
+                                            {{ $j + 1 }}
+                                        </div>
+                                        <input type="number" name="sumYard[{{ $j + 1 }}]" maxlength="3"
+                                            class="input-text" id="{{ $inputId }}"
+                                            style="width: 50%; font-size: 14pt; font-weight: bold; float: right;"
+                                            autocomplete="off">
+                                    </div>
                                 </div>
                             @endfor
+                            <p id="show{{ $i + 1 }}"
+                                style="background-color: rgb(255, 238, 0);margin-top: 2rem;">
+                                รวมแถวที่ {{ $i + 1 }}</p>
+
+                        </div>
+                    @endfor
 
 
 
 
-                            <div class="line_btn">
-                                <button name="submit" value="gotoIndex" class="btn b_order clean"><img
-                                        src="<?php echo asset('assets/images/xmark-solid.png'); ?>" width="15"> ยกเลิก</button>
-                                <button name="submit" value="nextData" class="btn b_save"><img
-                                        src="<?php echo asset('assets/images/circle-check-solid.png'); ?>" width="17">
-                                    บันทึกรายการถัดไป</button>
+                    <div class="line_btn">
+                        <button name="submit" value="gotoIndex" class="btn b_order clean"><img
+                                src="<?php echo asset('assets/images/xmark-solid.png'); ?>" width="15"> ยกเลิก</button>
+                        <button name="submit" value="nextData" class="btn b_save"><img
+                                src="<?php echo asset('assets/images/circle-check-solid.png'); ?>" width="17">
+                            บันทึกรายการถัดไป</button>
 
-                                <button name="submit" value="endData" class="btn b_save"><img
-                                        src="<?php echo asset('assets/images/circle-check-solid.png'); ?>" width="17">
-                                    บันทึกเสร็จสิ้น</button>
-                            </div>
+                        <button name="submit" value="endData" class="btn b_save"><img
+                                src="<?php echo asset('assets/images/circle-check-solid.png'); ?>" width="17">
+                            บันทึกเสร็จสิ้น</button>
+                    </div>
 
 
 
                 </form>
-                {{-- <h1>Enter 10 Numbers to Add</h1>
-    <form>
-      <div id="inputs"></div>
-      <br />
-      <label for="sum1">Sum:</label>
-      <input type="text" id="sum1" name="sum1" readonly />
-    </form> --}}
-                {{-- <script>
-      function createInputs() {
-        var inputsDiv = document.getElementById("inputs");
-        for (var i = 1; i <= 10; i++) {
-          var inputLabel = document.createElement("label");
-          inputLabel.setAttribute("for", "num" + i);
-          inputLabel.innerText = "Number " + i + ":";
-          var inputField = document.createElement("input");
-          inputField.setAttribute("type", "number");
-          inputField.setAttribute("id", "num" + i);
-          inputField.setAttribute("name", "num" + i);
-          inputField.setAttribute("oninput", "calculateSum()");
-          inputsDiv.appendChild(inputLabel);
-          inputsDiv.appendChild(inputField);
-          inputsDiv.appendChild(document.createElement("br"));
-        }
-      }
-
-      function calculateSum() {
-        var sum1 = 0;
-        for (var i = 1; i <= 10; i++) {
-          var num = document.getElementById("num" + i).value;
-          sum1 += parseInt(num);
-        }
-        document.getElementById("sum1").value = sum1;
-      }
-
-      createInputs();
-    </script> --}}
             </div>
-            <!--box-from-->
-        </div>
-        <!--content-->
-    </div> <!-- /.content-wrapper -->
-
+            </div>
+        </div> {{-- โค้ด JavaScript ที่เหลือ (ไม่ได้แก้ไข) --}}
     <script>
         function yd(valNum) {
             var m = (valNum * 0.9144).toFixed(4);
@@ -454,11 +368,6 @@
             var orderp = document.getElementById('orderSumM').value;
             var sumPriceP = orderp * valNum;
             var pyd = (sumPriceP / (orderp * 0.9144)).toFixed(2);
-
-            /*                var orderyd = document.getElementById('orderSumYard').value;
-                            var sumPriceYd = orderyd * valNum;
-                            var pm = (sumPriceYd / (orderyd / 0.9144)).toFixed(2);
-                            */
             document.getElementById('priceM').value = pyd;
 
         }
@@ -467,11 +376,6 @@
             var orderyd = document.getElementById('orderSumYard').value;
             var sumPriceYd = orderyd * valNum;
             var pm = (sumPriceYd / (orderyd / 0.9144)).toFixed(2);
-
-            /*                var orderp = document.getElementById('orderSumM').value;
-                            var sumPriceP = orderp * valNum;
-                            var pyd = (sumPriceP / (orderp * 0.9144)).toFixed(2);
-                            */
             document.getElementById('priceYard').value = pm;
 
         }
@@ -535,17 +439,17 @@
 
 
         // function setsupplierFunction(t, t1, t2) {
-        //     document.getElementById("fabricStruct").value = t1;
+        // 	document.getElementById("fabricStruct").value = t1;
 
-        //     document.getElementById("fabricPattern").value = t2;
+        // 	document.getElementById("fabricPattern").value = t2;
 
-        //     ul = document.getElementById(t);
-        //     //ul.style.display = "none";  
-        //     li = ul.getElementsByTagName("li");
+        // 	ul = document.getElementById(t);
+        // 	//ul.style.display = "none"; 	
+        // 	li = ul.getElementsByTagName("li");
 
-        //     for (i = 0; i < li.length; i++) {
-        //         li[i].style.display = "none";
-        //     }
+        // 	for (i = 0; i < li.length; i++) {
+        // 		li[i].style.display = "none";
+        // 	}
 
         // }
 
@@ -555,7 +459,7 @@
             document.getElementById("fabricW").value = t3;
 
             ul = document.getElementById(t);
-            //ul.style.display = "none";  
+            //ul.style.display = "none"; 	
             li = ul.getElementsByTagName("li");
 
             for (i = 0; i < li.length; i++) {
@@ -570,7 +474,7 @@
             document.getElementById("fabricW").value = t3;
 
             ul = document.getElementById(t);
-            //ul.style.display = "none";  
+            //ul.style.display = "none"; 	
             li = ul.getElementsByTagName("li");
 
             for (i = 0; i < li.length; i++) {
@@ -591,51 +495,51 @@
         // //alert(li.length);
 
         // for (i = 0; i < li.length; i++) {
-        //     li[i].style.display = "none";
+        // 	li[i].style.display = "none";
         // }
 
         // function customerFunction(id) {
-        //     var input, filter, ul, li, a, i, txtValue;
+        // 	var input, filter, ul, li, a, i, txtValue;
 
-        //     input = document.getElementById(id);
-        //     // alert(input );
-        //     filter = input.value.toUpperCase();
-        //     filter = filter.replace(/\s/g, "");
+        // 	input = document.getElementById(id);
+        // 	// alert(input );
+        // 	filter = input.value.toUpperCase();
+        // 	filter = filter.replace(/\s/g, "");
 
-        //     ul = document.getElementById("custom");
-        //     li = ul.getElementsByTagName("li");
-        //     for (i = 0; i < li.length; i++) {
-        //         if (filter == "") {
-        //             for (i = 0; i < li.length; i++) {
-        //                 li[i].style.display = "none";
-        //             }
-        //             break;
-        //         }
+        // 	ul = document.getElementById("custom");
+        // 	li = ul.getElementsByTagName("li");
+        // 	for (i = 0; i < li.length; i++) {
+        // 		if (filter == "") {
+        // 			for (i = 0; i < li.length; i++) {
+        // 				li[i].style.display = "none";
+        // 			}
+        // 			break;
+        // 		}
 
-        //         a = li[i].getElementsByTagName("a")[0];
-        //         txtValue = a.textContent || a.innerText;
-        //         txtValue = txtValue.replace(/\s/g, "");
+        // 		a = li[i].getElementsByTagName("a")[0];
+        // 		txtValue = a.textContent || a.innerText;
+        // 		txtValue = txtValue.replace(/\s/g, "");
 
-        //         if (txtValue.toUpperCase().indexOf(filter) > -1) {
-        //             li[i].style.display = "";
-        //         } else {
-        //             li[i].style.display = "none";
-        //         }
-        //     }
+        // 		if (txtValue.toUpperCase().indexOf(filter) > -1) {
+        // 			li[i].style.display = "";
+        // 		} else {
+        // 			li[i].style.display = "none";
+        // 		}
+        // 	}
         // }
 
         // function setcustomerFunction(t) {
-        //     document.getElementById("customer").value = t;
-        //     // document.getElementById("fabricPattern").value = t2;
-        //     // document.getElementById("fabricW").value = t3;
+        // 	document.getElementById("customer").value = t;
+        // 	// document.getElementById("fabricPattern").value = t2;
+        // 	// document.getElementById("fabricW").value = t3;
 
-        //     ul = document.getElementById(t);
-        //     //ul.style.display = "none";  
-        //     li = ul.getElementsByTagName("li");
+        // 	ul = document.getElementById(t);
+        // 	//ul.style.display = "none"; 	
+        // 	li = ul.getElementsByTagName("li");
 
-        //     for (i = 0; i < li.length; i++) {
-        //         li[i].style.display = "none";
-        //     }
+        // 	for (i = 0; i < li.length; i++) {
+        // 		li[i].style.display = "none";
+        // 	}
 
         // }
 
@@ -649,7 +553,7 @@
             document.getElementById("refId").value = t4;
 
             ul = document.getElementById('supp');
-            //ul.style.display = "none";  
+            //ul.style.display = "none"; 	
             li = ul.getElementsByTagName("li");
 
             for (i = 0; i < li.length; i++) {
@@ -684,7 +588,7 @@
         var c = <?php echo $c; ?>;
         let fabriccount = c;
 
-        // sessionSum  = sessionSum  + sessionStorage.getItem('sum');
+        // sessionSum  = sessionSum  + sessionStorage.getItem('sum');
         let sumElem = document.getElementById("sum");
         sumElem.textContent = "" + sessionSum;
 

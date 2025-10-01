@@ -40,7 +40,6 @@ class FabricimportController extends Controller
     {
         //
         //get all order status is except to manufacture.
-        // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
         $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
 
         $orders = AstPurchaseorder::select('id', 'purchaseOrder' , 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
@@ -53,10 +52,6 @@ class FabricimportController extends Controller
             ->groupBy('refId')
             ->get();
         // print_r($inventorydata);
-        // $fabricoutdata = fabricout::select('orderId', fabricout::raw('SUM(fold) as foldSum'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-        //     ->groupBy('orderId')
-        //     ->get();
-        // print_r($fabricoutdata);
         $fabricoutdata = fabricout::select('orderId', fabricout::raw('COUNT(fold) as foldCount'), fabricout::raw('SUM(sumYard) as sumYardSum'))
             ->whereNotNull('orderId')
             ->groupBy('orderId')
@@ -88,30 +83,7 @@ class FabricimportController extends Controller
     {
         //
         //get all order status is except to manufacture.
-        // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
         $ecp = FabricAststructure::select('purchaseOrder AS id')->get();
-
-        // $orders = AstPurchaseorder::select('ast_purchaseorders.id', 'ast_purchaseorders.customerName', 'ast_purchaseorders.fabricId',
-        //  'ast_purchaseorders.fabricStructure', 'ast_purchaseorders.fabricPattern',
-        //   'ast_purchaseorders.orderSumYard', 'ast_purchaseorders.purchaseOrder')
-        //     ->whereIn('id', $ecp)
-        //     ->orderBy('customerName')
-        //     ->get();
-
-        // $ecp = FabricAststructure::select('purchaseOrder AS id')->where('purchaseOrder', 'อนุมัติให้ผลิต')->get();
-
-        // $orderIds = $orders->pluck('id')->toArray();
-
-        // $records = FabricAst::groupBy(['purchaseOrder'])
-        //     ->select('purchaseOrder,fabric_w')
-        //     ->whereIn('purchaseOrder', $orderIds)
-        //     ->get();
-
-        // Add the fabric_w data to each item in the $orders collection
-        // $orders = $orders->map(function ($order) use ($records) {
-        //     $order->fabric_w = $records->where('purchaseOrder', $order->id)->pluck('fabric_w')->toArray();
-        //     return $order;
-        // });
 
         $orders = AstPurchaseorder::select(
             'ast_purchaseorders.id',
@@ -131,19 +103,12 @@ class FabricimportController extends Controller
 
 
         // print_r($records);
-
         // print_r('/////////');
-
         // print_r($orders);
+
         $customers = Customer::orderBy('name')->get();
         // print_r($customers);
 
-        // $orders123 = AstPurchaseorder::select('id', 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-        // ->whereIn('id', $ecp)
-        // // ->orderBy('created_at', 'desc')
-        // ->orderBy('createDate', 'desc')
-        // ->get();
-        // return view('fabricimport.create', compact('orders','customers','orders123'));
         return view('fabricimport.create', compact('orders', 'customers'));
     }
 
