@@ -29,7 +29,7 @@
         <div class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
-                    <h1 class="m-0"><i class="nav-icon fas fa fa-arrow-circle-right"></i> คีย์ผ้าเข้าสต็อก</h1>
+                    <h1 class="m-0"><i class="nav-icon fas fa fa-arrow-circle-right"></i> ซื้อผ้าเข้าสต็อก</h1>
                 </div>
             </div>
         </div>
@@ -37,7 +37,7 @@
         <div class="content">
             <div class="box-from">
 
-                <h2 class="title"><i class="fa fa-caret-right"></i> ซืผ้าเข้าสต็อก</h2>
+                <h2 class="title"><i class="fa fa-caret-right"></i> ซื้อผ้าเข้าสต็อก</h2>
                 <form method="post" action="{{ route('inventory.store') }}" id="myForm">
                     @csrf
 
