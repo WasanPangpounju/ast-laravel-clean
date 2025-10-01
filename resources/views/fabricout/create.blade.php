@@ -172,12 +172,18 @@
   @endforelse
 </select>
 
+
                                     @if(!empty($selStockStruct))
-                                        <small class="text-muted d-block mt-1">
-                                            สต็อกที่เลือกปัจจุบัน:
-                                            <b>[{{ $selStockCustomer }}]</b>
-                                            {{ $selStockStruct }} | {{ $selStockPattern }} | {{ $selStockW }}''
-                                        </small>
+                                    <small id="stockCurrentDisplay" class="text-muted d-block mt-1">
+  @if(!empty($selStockStruct))
+    สต็อกที่เลือกปัจจุบัน:
+    <b>[{{ $selStockCustomer }}]</b>
+    {{ $selStockStruct }} | {{ $selStockPattern }} | {{ $selStockW }}''
+  @else
+    สต็อกที่เลือกปัจจุบัน: <i>ยังไม่ได้เลือก</i>
+  @endif
+</small>
+
                                     @endif
                                 </div>
                                 {{-- ============ /เลือก "ตัดจากสต็อก" ============ --}}
@@ -606,4 +612,43 @@
       syncHiddenFromSelected();
     })();
     </script>
+
+    <script>
+(function(){
+  const picker = document.getElementById('stockPicker');
+
+  // hidden fields (ต้องมีแค่ชุดเดียวบนหน้า)
+  const fC = document.getElementById('stockCustomer');
+  const fS = document.getElementById('stockFabricStruct');
+  const fP = document.getElementById('stockFabricPattern');
+  const fW = document.getElementById('stockFabricW');
+
+  const currentEl = document.getElementById('stockCurrentDisplay');
+
+  function renderCurrent(){
+    if (!currentEl) return;
+    const c = fC?.value || '';
+    const s = fS?.value || '';
+    const p = fP?.value || '';
+    const w = fW?.value || '';
+    currentEl.innerHTML = (c && s)
+      ? `สต็อกที่เลือกปัจจุบัน: <b>[${c}]</b> ${s} | ${p} | ${w}''`
+      : `สต็อกที่เลือกปัจจุบัน: <i>ยังไม่ได้เลือก</i>`;
+  }
+
+  function syncFromSelected(){
+    const opt = picker?.options[picker.selectedIndex];
+    if (!opt) return;
+    fC.value = opt.dataset.customer || '';
+    fS.value = opt.dataset.struct   || '';
+    fP.value = opt.dataset.pattern  || '';
+    fW.value = opt.dataset.w        || '';
+    renderCurrent();
+  }
+
+  picker?.addEventListener('change', syncFromSelected);
+  syncFromSelected(); // ให้ตรงกับ option เริ่มต้นตอนโหลดหน้า
+})();
+</script>
+
 @endsection
