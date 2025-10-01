@@ -173,13 +173,13 @@
 </select>
 
 
-                                    @if(!empty($selStockStruct))
+                                    {{-- @if(!empty($selStockStruct)) --}}
                                     <small id="stockCurrentDisplay" class="text-muted d-block mt-1">
   สต็อกที่เลือกปัจจุบัน: <i>ยังไม่ได้เลือก</i>
 </small>
 
 
-                                    @endif
+                                    {{-- @endif--}}
                                 </div>
                                 {{-- ============ /เลือก "ตัดจากสต็อก" ============ --}}
 
