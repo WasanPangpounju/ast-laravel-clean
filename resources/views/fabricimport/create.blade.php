@@ -37,7 +37,7 @@
         <div class="content">
             <div class="box-from">
 
-                <h2 class="title"><i class="fa fa-caret-right"></i> คีย์ผ้าเข้าสต็อก</h2>
+                <h2 class="title"><i class="fa fa-caret-right"></i> ซื้อผ้าเข้าสต็อก</h2>
                 <form method="post" action="{{ route('inventory.store') }}" id="myForm">
                     @csrf
 
