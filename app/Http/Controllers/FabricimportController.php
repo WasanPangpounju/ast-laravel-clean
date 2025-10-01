@@ -143,8 +143,8 @@ class FabricimportController extends Controller
         // // ->orderBy('created_at', 'desc')
         // ->orderBy('createDate', 'desc')
         // ->get();
-        // return view('inventory.create', compact('orders','customers','orders123'));
-        return view('fabricimport.create', compact('orders', 'customers'));
+        return view('fabricimport.create', compact('orders','customers','orders123'));
+        // return view('fabricimport.create', compact('orders', 'customers'));
     }
 
     /**
