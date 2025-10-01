@@ -278,7 +278,7 @@
                             </a>
                             <ul class="nav nav-treeview">
                                 <li class="nav-item">
-                                    <a href="{{ route('inventory.create') }}" class="nav-link"><i
+                                    <a href="{{ route('.create') }}" class="nav-link"><i
                                             class="far fa-circle nav-icon"></i>
                                         <p>คีย์ผ้าเข้าสต็อก</p>
                                     </a>
