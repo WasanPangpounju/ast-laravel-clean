@@ -171,6 +171,9 @@
     <option value="">(ไม่มีรายการให้เลือก)</option>
   @endforelse
 </select>
+<small id="stockCurrentDisplay" class="text-muted d-block mt-1">
+  สต็อกที่เลือกปัจจุบัน: <i>ยังไม่ได้เลือก</i>
+</small>
 
 
                                     {{-- @if(!empty($selStockStruct)) --}}
