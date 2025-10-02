@@ -48,7 +48,16 @@
                     } else {
                         $c = 0;
                     }
-                    // ดึงข้อมูลใหม่จาก Session
+                    
+                    // ดึงข้อมูลหลักจาก Session (สำหรับฟอร์มหลัก)
+                    $dt = session()->get('dt') ?? '';
+                    $fabricStruct = session()->get('fabricStruct') ?? '';
+                    $fabricPattern = session()->get('fabricPattern') ?? '';
+                    $fabricW = session()->get('fabricW') ?? '';
+                    $customer = session()->get('customer') ?? '';
+                    $fabricId = session()->get('fabricId') ?? '';
+
+                    // ดึงข้อมูลใหม่จาก Session (สำหรับฟอร์มซื้อเข้า)
                     $supplierName = session()->get('supplierName') ?? '';
                     $invoiceNo = session()->get('invoiceNo') ?? '';
                     $unitPrice = session()->get('unitPrice') ?? '';
@@ -94,61 +103,25 @@
                     </div>
 
                     {{-- -------------------------------------------------------------------------------- --}}
-                    {{-- ส่วนการกรอกข้อมูลหลัก (ถูกจัดเรียงใหม่เป็น 2 คอลัมน์) --}}
-                    <div class="container">
+                    {{-- ส่วนข้อมูลหลัก (วันที่, รหัสผ้า, ผู้ขาย, บิล) - แสดงอยู่ด้านบนสุด --}}
+                    <div class="container mt-4 mb-4">
                         <div class="row">
                             
-                            {{-- COLUMN 1: ข้อมูลผ้าและลูกค้า (ข้อมูลเดิม) --}}
-                            <div class="col-md-4">
+                            <div class="col-md-6 border-right">
+                                <h4 class="mb-3" style="color: #1bccbd;">ข้อมูลผ้าและลูกค้า</h4>
                                 <p>จำนวนรวม : <strong id="fabriccount"></strong> พับ <strong id="sum"></strong> หลา</p>
                                 
-                                {{-- โค้ด PHP/Blade เดิมสำหรับแสดงข้อมูลหลักที่เก็บใน Session --}}
-                                <?php
-                                if (session()->has('dt')) {
-                                    $dt = session()->get('dt');
-                                } else {
-                                    $dt = '';
-                                }
-                                
-                                if (session()->has('fabricStruct')) {
-                                    $fabricStruct = session()->get('fabricStruct');
-                                } else {
-                                    $fabricStruct = '';
-                                }
-                                
-                                if (session()->has('fabricPattern')) {
-                                    $fabricPattern = session()->get('fabricPattern');
-                                } else {
-                                    $fabricPattern = '';
-                                }
-                                
-                                if (session()->has('fabricW')) {
-                                    $fabricW = session()->get('fabricW');
-                                } else {
-                                    $fabricW = '';
-                                }
-                                
-                                if (session()->has('customer')) {
-                                    $customer = session()->get('customer');
-                                } else {
-                                    $customer = '';
-                                }
-                                if (session()->has('fabricId')) {
-                                    $fabricId = session()->get('fabricId');
-                                } else {
-                                    $fabricId = '';
-                                }
-                                ?>
-                                
-                                {{-- ถ้ามีข้อมูลใน Session ให้แสดงข้อมูลและซ่อนฟอร์ม --}}
+                                {{-- โค้ดแสดงข้อมูลที่ถูกเก็บใน Session (Next Data) --}}
                                 <?php if ($dt != '' && $fabricStruct != '' && $fabricW != '') {
-                                    print($date = date('d/m/Y', strtotime($dt)));
-                                    print($fabricId . '<br>');
-                                    print($fabricStruct);
-                                    print($fabricPattern);
-                                    print($fabricW);
-                                    print($customer);
+                                    $date = date('d/m/Y', strtotime($dt));
+                                    echo "<div><strong style='color:green;'>ข้อมูลที่บันทึกแล้ว:</strong></div>";
+                                    echo "<div><strong>วันที่:</strong> $date</div>";
+                                    echo "<div><strong>รหัสผ้า:</strong> $fabricId</div>";
+                                    echo "<div><strong>โครงสร้าง/ลาย/หน้ากว้าง:</strong> $fabricStruct / $fabricPattern / $fabricW</div>";
+                                    echo "<div><strong>ลูกค้า:</strong> $customer</div>";
+                                    
                                     ?>
+                                    {{-- Hidden Fields สำหรับส่งค่าซ้ำ --}}
                                     <input type="hidden" name="dt" class="form-control" value="<?php print $dt; ?>">
                                     <input type="hidden" name="fabricStruct" class="form-control" value="<?php print $fabricStruct; ?>">
                                     <input type="hidden" name="fabricPattern" class="form-control" value="<?php print $fabricPattern; ?>">
@@ -156,29 +129,22 @@
                                     <input type="hidden" name="customer" class="form-control" value="<?php print $customer; ?>">
                                     <input type="hidden" name="fabricId" class="form-control" value="<?php print $fabricId; ?>">
                                     
-                                    {{-- Hidden Fields สำหรับข้อมูลซื้อเข้าใหม่ที่มาจาก Session --}}
                                     <input type="hidden" name="supplierName" class="form-control" value="{{ $supplierName }}">
                                     <input type="hidden" name="invoiceNo" class="form-control" value="{{ $invoiceNo }}">
                                     <input type="hidden" name="unitPrice" class="form-control" value="{{ $unitPrice }}">
                                     <input type="hidden" name="dyeLot" class="form-control" value="{{ $dyeLot }}">
                                     <input type="hidden" name="location" class="form-control" value="{{ $location }}">
 
-                                {{-- ถ้าไม่มีข้อมูลใน Session ให้แสดงฟอร์มกรอกข้อมูลหลัก --}}
+                                {{-- ฟอร์มกรอกข้อมูลหลัก --}}
                                 <?php } else { ?>
 
                                 <div class="form-group">
-                                    <label for="dt">วันที่</label>
+                                    <label for="dt">วันที่ <span class="text-danger">*</span></label>
                                     <input class="date form-control" type="text" name="dt" autocomplete="off" required>
                                 </div>
-                                <script type="text/javascript">
-                                    $('.date').datepicker({
-                                        format: 'dd-mm-yyyy',
-                                        orientation: "bottom",
-                                    });
-                                </script>
                                 
                                 <div class="form-group">
-                                    <label for="fabricId">รหัสผ้า </label>
+                                    <label for="fabricId">รหัสผ้า <span class="text-danger">*</span></label>
                                     <input type="text" name="fabricId" onkeyup="fabricIdFunction('fabricId')"
                                         list="brow" id="fabricIdInput" class="form-control" autocomplete="off"
                                         placeholder="รหัสผ้า" required>
@@ -191,17 +157,17 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="fabricStruct">โครงสร้างผ้า </label>
+                                    <label for="fabricStruct">โครงสร้างผ้า <span class="text-danger">*</span></label>
                                     <input type="text" name="fabricStruct" class="form-control" id="fabricStructureInput" placeholder="โครงสร้างผ้า" value="{{ $fabricStruct }}" required>
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="fabricPattern">ลายผ้า </label>
+                                    <label for="fabricPattern">ลายผ้า <span class="text-danger">*</span></label>
                                     <input type="text" name="fabricPattern" class="form-control" id="fabricPatternInput" placeholder="ลายผ้า" value="{{ $fabricPattern }}" required>
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="fabricW">หน้ากว้าง </label>
+                                    <label for="fabricW">หน้ากว้าง <span class="text-danger">*</span></label>
                                     <input type="text" name="fabricW" class="form-control" id="fabricWidthInput" placeholder="หน้ากว้าง" value="{{ $fabricW }} " required>
                                 </div>
 
@@ -240,11 +206,9 @@
                                 <?php } ?>
                             </div>
                             
-                            {{-- -------------------------------------------------------------------------------- --}}
-                            
                             {{-- COLUMN 2: ข้อมูลการซื้อเข้าใหม่ (Supplier, Invoice, Price, Lot) 🏭💵 --}}
-                            <div class="col-md-4">
-                                <h4 class="mt-4 mb-3" style="color: #007bff;"><i class="fas fa-warehouse"></i> ข้อมูลการซื้อเข้า</h4>
+                            <div class="col-md-6">
+                                <h4 class="mb-3" style="color: #ec9c06;"><i class="fas fa-warehouse"></i> ข้อมูลการซื้อเข้า</h4>
                                 
                                 <div class="form-group">
                                     <label for="supplierName">ชื่อผู้ขาย / โรงงาน 🏭 <span class="text-danger">*</span></label>
@@ -277,49 +241,46 @@
                                 </div>
                             </div>
                             
-                            {{-- -------------------------------------------------------------------------------- --}}
-
-                            <div class="col-md-4">
-                                {{-- ส่วนนี้เว้นไว้สำหรับ Layout ที่สวยงาม --}}
-                            </div>
-
                         </div>
                     </div>
                     {{-- -------------------------------------------------------------------------------- --}}
                     
                     
-                    {{-- Your input fields go here (ส่วนการกรอกจำนวนหลาแต่ละพับ) --}}
-                    @for ($i = 0; $i < 8; $i++)
-                        <div class="col-md-1" style="margin: -0.5em;">
-                            @for ($k = 0; $k < 20; $k++)
-                                <div class="form-group">
-                                    @php
-                                        $j = $i * 20 + $k + $c;
-                                        $l = $i * 20 + $k;
-                                        
-                                        $inputId = 'sumYard' . ($l + 1);
-                                    @endphp
-                                    <label for="sumYard{{ $j + 1 }}"></label>
-                                    <div>
-                                        <div
-                                            style="background-color: rgb(255, 238, 0); margin-bottom: -1.5rem; text-align: center; margin-right: 2.5rem;">
-                                            {{ $j + 1 }}
+                    {{-- ส่วนการกรอกจำนวนหลาแต่ละพับ (แสดงผลแบบเดิม: 8 คอลัมน์) --}}
+                    <div class="container">
+                        <div class="row">
+                            @for ($i = 0; $i < 8; $i++)
+                                <div class="col-md-1" style="margin: -0.5em;">
+                                    @for ($k = 0; $k < 20; $k++)
+                                        <div class="form-group">
+                                            @php
+                                                $j = $i * 20 + $k + $c;
+                                                $l = $i * 20 + $k;
+                                                
+                                                $inputId = 'sumYard' . ($l + 1);
+                                            @endphp
+                                            <label for="sumYard{{ $j + 1 }}"></label>
+                                            <div>
+                                                <div
+                                                    style="background-color: rgb(255, 238, 0); margin-bottom: -1.5rem; text-align: center; margin-right: 2.5rem;">
+                                                    {{ $j + 1 }}
+                                                </div>
+                                                <input type="number" name="sumYard[{{ $j + 1 }}]" maxlength="3"
+                                                    class="input-text" id="{{ $inputId }}"
+                                                    style="width: 50%; font-size: 14pt; font-weight: bold; float: right;"
+                                                    autocomplete="off">
+                                            </div>
                                         </div>
-                                        <input type="number" name="sumYard[{{ $j + 1 }}]" maxlength="3"
-                                            class="input-text" id="{{ $inputId }}"
-                                            style="width: 50%; font-size: 14pt; font-weight: bold; float: right;"
-                                            autocomplete="off">
-                                    </div>
+                                    @endfor
+                                    <p id="show{{ $i + 1 }}"
+                                        style="background-color: rgb(255, 238, 0);margin-top: 2rem;">
+                                        รวมแถวที่ {{ $i + 1 }}</p>
+
                                 </div>
                             @endfor
-                            <p id="show{{ $i + 1 }}"
-                                style="background-color: rgb(255, 238, 0);margin-top: 2rem;">
-                                รวมแถวที่ {{ $i + 1 }}</p>
-
                         </div>
-                    @endfor
-
-
+                    </div>
+                    
 
 
                     <div class="line_btn">
@@ -339,8 +300,7 @@
                 </form>
             </div>
             </div>
-        </div> {{-- โค้ด JavaScript ที่เหลือ (ไม่ได้แก้ไข) --}}
-    <script>
+        </div> <script>
         function yd(valNum) {
             var m = (valNum * 0.9144).toFixed(4);
             document.getElementById('sumM').value = m;
@@ -397,9 +357,7 @@
         var input, filter, ul, li, a, i, txtValue;
 
         ul = document.getElementById("supp");
-        // ul = document.getElementById("custom");
         li = ul.getElementsByTagName("li");
-        //alert(li.length);
 
         for (i = 0; i < li.length; i++) {
             li[i].style.display = "none";
@@ -411,7 +369,6 @@
             var input, filter, ul, li, a, i, txtValue;
 
             input = document.getElementById(id);
-            // alert(input );
             filter = input.value.toUpperCase();
             filter = filter.replace(/\s/g, "");
 
@@ -438,28 +395,12 @@
         }
 
 
-        // function setsupplierFunction(t, t1, t2) {
-        // 	document.getElementById("fabricStruct").value = t1;
-
-        // 	document.getElementById("fabricPattern").value = t2;
-
-        // 	ul = document.getElementById(t);
-        // 	//ul.style.display = "none"; 	
-        // 	li = ul.getElementsByTagName("li");
-
-        // 	for (i = 0; i < li.length; i++) {
-        // 		li[i].style.display = "none";
-        // 	}
-
-        // }
-
         function setsupplierFunction(t, t1, t2, t3) {
             document.getElementById("fabricStruct").value = t1;
             document.getElementById("fabricPattern").value = t2;
             document.getElementById("fabricW").value = t3;
 
             ul = document.getElementById(t);
-            //ul.style.display = "none"; 	
             li = ul.getElementsByTagName("li");
 
             for (i = 0; i < li.length; i++) {
@@ -467,84 +408,6 @@
             }
 
         }
-
-        function setsupplierFunction(t, t1, t2, t3) {
-            document.getElementById("fabricStruct").value = t1;
-            document.getElementById("fabricPattern").value = t2;
-            document.getElementById("fabricW").value = t3;
-
-            ul = document.getElementById(t);
-            //ul.style.display = "none"; 	
-            li = ul.getElementsByTagName("li");
-
-            for (i = 0; i < li.length; i++) {
-                li[i].style.display = "none";
-            }
-
-        }
-
-
-        ////////////////////////////////////////////////////////////
-
-
-        // var input, filter, ul, li, a, i, txtValue;
-
-        // // ul = document.getElementById("supp");
-        // ul = document.getElementById("custom");
-        // li = ul.getElementsByTagName("li");
-        // //alert(li.length);
-
-        // for (i = 0; i < li.length; i++) {
-        // 	li[i].style.display = "none";
-        // }
-
-        // function customerFunction(id) {
-        // 	var input, filter, ul, li, a, i, txtValue;
-
-        // 	input = document.getElementById(id);
-        // 	// alert(input );
-        // 	filter = input.value.toUpperCase();
-        // 	filter = filter.replace(/\s/g, "");
-
-        // 	ul = document.getElementById("custom");
-        // 	li = ul.getElementsByTagName("li");
-        // 	for (i = 0; i < li.length; i++) {
-        // 		if (filter == "") {
-        // 			for (i = 0; i < li.length; i++) {
-        // 				li[i].style.display = "none";
-        // 			}
-        // 			break;
-        // 		}
-
-        // 		a = li[i].getElementsByTagName("a")[0];
-        // 		txtValue = a.textContent || a.innerText;
-        // 		txtValue = txtValue.replace(/\s/g, "");
-
-        // 		if (txtValue.toUpperCase().indexOf(filter) > -1) {
-        // 			li[i].style.display = "";
-        // 		} else {
-        // 			li[i].style.display = "none";
-        // 		}
-        // 	}
-        // }
-
-        // function setcustomerFunction(t) {
-        // 	document.getElementById("customer").value = t;
-        // 	// document.getElementById("fabricPattern").value = t2;
-        // 	// document.getElementById("fabricW").value = t3;
-
-        // 	ul = document.getElementById(t);
-        // 	//ul.style.display = "none"; 	
-        // 	li = ul.getElementsByTagName("li");
-
-        // 	for (i = 0; i < li.length; i++) {
-        // 		li[i].style.display = "none";
-        // 	}
-
-        // }
-
-
-        // /////////////////////////////////////////////////////////////////////////////////
 
         function setOrderIdFunction(t, t1, t2, t3, t4) {
             document.getElementById("orderId").value = t1;
@@ -553,7 +416,6 @@
             document.getElementById("refId").value = t4;
 
             ul = document.getElementById('supp');
-            //ul.style.display = "none"; 	
             li = ul.getElementsByTagName("li");
 
             for (i = 0; i < li.length; i++) {
@@ -582,13 +444,11 @@
         let inputBoxes = document.getElementsByClassName("input-text");
 
         // Initialize the sum from the session storage, or 0 if it's not present
-        // let sessionSum = parseFloat(sessionStorage.getItem("sessionSum")) || 0;
         let sessionSum = parseFloat("{{ session('sum') }}") || 0;
 
         var c = <?php echo $c; ?>;
         let fabriccount = c;
 
-        // sessionSum  = sessionSum  + sessionStorage.getItem('sum');
         let sumElem = document.getElementById("sum");
         sumElem.textContent = "" + sessionSum;
 
@@ -648,26 +508,6 @@
                 let sumcolumn1 = document.getElementById("show1");
                 sumcolumn1.textContent = "รวม: " + sum1;
 
-                // Add an event listener to each input text box that updates the total sum whenever its value changes
-                // Array.from(inputBoxes).forEach(inputBox => {
-                // inputBox.addEventListener("change", function() {
-                // Extract the numbers from all input text boxes
-                // let numbers = Array.from(inputBoxes).map(inputBox => {
-                // let number = parseFloat(inputBox.value);
-                // return isNaN(number) ? 0 : number;
-                // });
-
-
-                // Compute the sum of the numbers
-                // let sum = numbers.reduce((total, number) => total + number, 0);
-                // let sumback = "{{ session('sum') }}";
-                // sum = sum + Number(sumback);
-                // fabriccount = fabriccount + 1;
-                // Display the total sum in the "sum" paragraph element
-                // sumElem.textContent = "" + sum;
-                // fabriccountsum.textContent = "" + fabriccount;
-                // Store the sum in the session storage with a unique key name
-                // sessionStorage.setItem("sessionSum_" + Date.now(), sum);
             });
         });
 
