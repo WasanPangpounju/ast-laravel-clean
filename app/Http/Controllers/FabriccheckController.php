@@ -3,22 +3,26 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\stockfabric; // <- ใช้งานตารางคีย์ผ้าเข้า
 
 class FabriccheckController extends Controller
 {
-    public function index()
+    public function __construct()
     {
-        // ส่งค่ากลวง ๆ ให้ view เพื่อไม่ให้ error
-        return view('fabricoutcheck.index', [
-            'importorder'       => collect(),
-            'stockFabricStruct' => collect(),
-            'allfabricout'      => collect(),
-        ]);
+        $this->middleware('auth');
     }
 
-    public function store(Request $request)
+    public function index(Request $request)
     {
-        // ชั่วคราว: แค่ย้อนกลับไปหน้า index
-        return redirect()->route('fabriccheck.index');
+        // กรองพื้นฐาน (ถ้าภายหลังอยากเพิ่มค้นหา ค่อยต่อยอดได้)
+        $query = stockfabric::query()->orderByDesc('id');
+
+        // ดึง 500 รายการล่าสุดด้วย cursor pagination
+        // ชื่อพารามิเตอร์จะเป็น ?cursor=xxxx โดยอัตโนมัติ
+        $rows = $query->cursorPaginate(500);
+
+        return view('fabriccheck.index', [
+            'rows' => $rows,
+        ]);
     }
 }
