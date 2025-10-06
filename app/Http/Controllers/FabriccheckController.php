@@ -13,62 +13,53 @@ class FabriccheckController extends Controller
         $this->middleware('auth');
     }
 
-    // หน้า “สรุปตาม Ref” — 500 กลุ่มล่าสุด/ครั้ง (cursor pagination)
+    // 🧾 หน้าแสดงสรุปตาม Ref
     public function index(Request $request)
     {
-        // สรุปตาม refId พร้อมรวมพับและหลา และดึง field ที่ช่วย preview (เลือก MAX/MIN แบบเร็ว)
         $summary = stockfabric::select([
                 'refId',
-                DB::raw('COUNT(*)                       AS folds'),
-                DB::raw('SUM(sumYard)                  AS yards'),
-                DB::raw('MIN(createDate)               AS first_date'),
-                DB::raw('MAX(createDate)               AS last_date'),
-                DB::raw('MAX(id)                       AS last_id'),
-                DB::raw('MAX(emp)                      AS emp'),
-                DB::raw('MAX(fabricId)                 AS fabricId'),
-                DB::raw('MAX(fabricStruct)             AS fabricStruct'),
-                DB::raw('MAX(fabricPattern)            AS fabricPattern'),
-                DB::raw('MAX(fabricW)                  AS fabricW'),
-                DB::raw('MAX(customer)                 AS customer'),
+                DB::raw('COUNT(*)        AS folds'),
+                DB::raw('SUM(sumYard)    AS yards'),
+                DB::raw('MAX(createDate) AS key_date'),
+                DB::raw('MAX(id)         AS last_id'),
+                DB::raw('MAX(emp)        AS emp'),
+                DB::raw('MAX(customer)   AS customer'),
+                DB::raw('MAX(fabricId)   AS fabricId'),
+                DB::raw('MAX(fabricStruct)   AS fabricStruct'),
+                DB::raw('MAX(fabricPattern)  AS fabricPattern'),
+                DB::raw('MAX(fabricW)    AS fabricW'),
             ])
             ->groupBy('refId')
-            ->orderByDesc('last_id')  // ล่าสุดก่อน
+            ->orderByDesc('last_id')
             ->cursorPaginate(500);
 
-        return view('fabriccheck.index', [
-            'rows' => $summary,
-        ]);
+        return view('fabriccheck.index', ['rows' => $summary]);
     }
 
-    // หน้า “รายละเอียดตาม Ref”
-    public function show(string $refId)
+    // 📄 หน้าแสดงรายละเอียดของแต่ละ Ref
+    public function show($refId)
     {
         $items = stockfabric::where('refId', $refId)
-            ->orderBy('fold') // พับเรียงสวย ๆ
+            ->orderBy('fold')
             ->get();
 
-        // สรุปหัวตาราง (header)
-        $header = stockfabric::where('refId', $refId)
-            ->select([
-                'refId',
-                DB::raw('COUNT(*)       AS folds'),
-                DB::raw('SUM(sumYard)    AS yards'),
-                DB::raw('MIN(createDate) AS first_date'),
-                DB::raw('MAX(createDate) AS last_date'),
-                DB::raw('MAX(emp)        AS emp'),
-                DB::raw('MAX(fabricId)   AS fabricId'),
-                DB::raw('MAX(fabricStruct) AS fabricStruct'),
-                DB::raw('MAX(fabricPattern) AS fabricPattern'),
-                DB::raw('MAX(fabricW)    AS fabricW'),
-                DB::raw('MAX(customer)   AS customer'),
-            ])
-            ->first();
+        if ($items->isEmpty()) {
+            abort(404, 'ไม่พบข้อมูล Ref นี้');
+        }
 
-        abort_if(!$header, 404);
+        $header = (object)[
+            'refId'         => $refId,
+            'emp'           => $items->first()->emp,
+            'customer'      => $items->first()->customer,
+            'fabricId'      => $items->first()->fabricId,
+            'fabricStruct'  => $items->first()->fabricStruct,
+            'fabricPattern' => $items->first()->fabricPattern,
+            'fabricW'       => $items->first()->fabricW,
+            'folds'         => $items->count(),
+            'yards'         => $items->sum('sumYard'),
+            'key_date'      => $items->first()->createDate ?? $items->first()->created_at,
+        ];
 
-        return view('fabriccheck.show', [
-            'header' => $header,
-            'items'  => $items,
-        ]);
+        return view('fabriccheck.show', compact('header', 'items'));
     }
 }

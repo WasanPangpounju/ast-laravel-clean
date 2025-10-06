@@ -5,7 +5,7 @@
   <div class="content-header">
     <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1 class="m-0"><i class="nav-icon fas fa-clipboard-list"></i> ตรวจสอบคีย์ผ้าเข้าสต็อก (สรุปตาม Ref)</h1>
-      <small class="text-muted">แสดง 500 Ref ล่าสุด/ชุด</small>
+      <small class="text-muted">แสดง 500 Ref ล่าสุด</small>
     </div>
   </div>
 
@@ -17,33 +17,33 @@
             <table class="table table-sm table-striped table-bordered mb-0">
               <thead class="thead-light">
                 <tr class="text-center">
-                  <th>#</th>
-                  <th>Ref</th>
+                  <th style="width:60px;">#</th>
                   <th>ผู้คีย์</th>
                   <th>ลูกค้า</th>
-                  <th>รหัส/โครงสร้าง/ลาย/หน้ากว้าง</th>
+                  <th>รหัส</th>
+                  <th>โครงสร้าง</th>
+                  <th>ลายผ้า</th>
+                  <th>หน้ากว้าง</th>
                   <th>รวมพับ</th>
                   <th>รวม (หลา)</th>
-                  <th>ช่วงวันที่คีย์</th>
-                  <th>ดำเนินการ</th>
+                  <th>วันที่คีย์</th>
+                  <th style="width:120px;">การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody>
                 @forelse ($rows as $r)
                   <tr>
                     <td class="text-center">{{ $loop->iteration }}</td>
-                    <td class="text-monospace">{{ $r->refId }}</td>
                     <td>{{ $r->emp }}</td>
                     <td>{{ $r->customer }}</td>
-                    <td class="text-nowrap">
-                      {{ $r->fabricId }} / {{ $r->fabricStruct }} / {{ $r->fabricPattern }} / {{ $r->fabricW }}
-                    </td>
+                    <td class="text-nowrap">{{ $r->fabricId }}</td>
+                    <td>{{ $r->fabricStruct }}</td>
+                    <td>{{ $r->fabricPattern }}</td>
+                    <td class="text-nowrap">{{ $r->fabricW }}</td>
                     <td class="text-right">{{ number_format($r->folds) }}</td>
                     <td class="text-right">{{ number_format($r->yards, 2) }}</td>
-                    <td class="text-nowrap">
-                      {{ \Carbon\Carbon::parse($r->first_date)->format('d/m/Y') }}
-                      -
-                      {{ \Carbon\Carbon::parse($r->last_date)->format('d/m/Y') }}
+                    <td class="text-nowrap text-center">
+                      {{ \Carbon\Carbon::parse($r->key_date)->format('d/m/Y') }}
                     </td>
                     <td class="text-center">
                       <a class="btn btn-primary btn-sm" href="{{ route('fabriccheck.show', $r->refId) }}">
@@ -52,7 +52,7 @@
                     </td>
                   </tr>
                 @empty
-                  <tr><td colspan="9" class="text-center text-muted p-4">ยังไม่มีข้อมูล</td></tr>
+                  <tr><td colspan="11" class="text-center text-muted p-4">ยังไม่มีข้อมูล</td></tr>
                 @endforelse
               </tbody>
             </table>

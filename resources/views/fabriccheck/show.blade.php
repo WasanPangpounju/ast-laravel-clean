@@ -30,10 +30,8 @@
             <div class="col-md-3"><strong>รวมพับ:</strong> {{ number_format($header->folds) }}</div>
             <div class="col-md-3"><strong>รวม(หลา):</strong> {{ number_format($header->yards, 2) }}</div>
             <div class="col-md-6">
-              <strong>ช่วงวันที่คีย์:</strong>
-              {{ \Carbon\Carbon::parse($header->first_date)->format('d/m/Y') }}
-              -
-              {{ \Carbon\Carbon::parse($header->last_date)->format('d/m/Y') }}
+              <strong>วันที่คีย์:</strong>
+              {{ \Carbon\Carbon::parse($header->key_date)->format('d/m/Y') }}
             </div>
           </div>
         </div>
@@ -56,7 +54,7 @@
                 @foreach ($items as $it)
                   <tr>
                     <td class="text-right">{{ number_format($it->fold) }}</td>
-                    <td class="text-nowrap">
+                    <td class="text-nowrap text-center">
                       {{ \Carbon\Carbon::parse($it->createDate ?? $it->created_at)->format('d/m/Y') }}
                     </td>
                     <td class="text-right">{{ number_format($it->sumYard, 2) }}</td>
