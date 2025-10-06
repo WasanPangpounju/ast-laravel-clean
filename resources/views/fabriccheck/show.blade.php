@@ -3,6 +3,26 @@
 @section('content')
 <div class="content-wrapper">
 
+  {{-- CSS: บังคับให้ปุ่ม/แอ็กชันแสดงตลอดเวลา --}}
+  <style>
+    .header-actions .btn,
+    .action-cell .btn,
+    .action-cell .row-actions {
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+    .header-actions form,
+    .action-cell form {
+      display: inline-block;
+      margin: 0 4px;
+    }
+    /* กันธีมบางตัวที่ซ่อนปุ่มในตารางจนกว่า hover */
+    .table .row-actions { 
+      display: inline-flex !important; 
+      gap: .25rem;
+    }
+  </style>
+
   {{-- Breadcrumb --}}
   <div class="">
     <ol class="breadcrumb">
@@ -14,16 +34,16 @@
 
   {{-- Header --}}
   <div class="content-header">
-    <div class="container-fluid d-flex justify-content-between align-items-center">
+    <div class="container-fluid d-flex justify-content-between align-items-center header-actions">
       <h1 class="m-0">
         <i class="nav-icon fas fa-search"></i>
         รายละเอียดการคีย์
       </h1>
 
-      <div class="d-flex gap-2">
-        {{-- ลบทั้งชุด (ไม่แสดง ref ในปุ่ม/ข้อความ) --}}
+      <div>
+        {{-- ลบทั้งชุด --}}
         <form method="POST" action="{{ route('fabriccheck.destroy', $refId) }}"
-              onsubmit="return confirm('ยืนยันลบรายการคีย์ชุดนี้ทั้งหมดหรือไม่?');" class="mr-2">
+              onsubmit="return confirm('ยืนยันลบรายการคีย์ชุดนี้ทั้งหมดหรือไม่?');">
           @csrf
           @method('DELETE')
           <button type="submit" class="btn btn-danger btn-sm">
@@ -82,7 +102,7 @@
                   <th style="width: 140px;">วันที่คีย์</th>
                   <th>ยอด (หลา)</th>
                   <th>ผู้คีย์</th>
-                  <th style="width: 110px;">การดำเนินการ</th>
+                  <th style="width: 140px;">การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -94,14 +114,16 @@
                     </td>
                     <td class="text-right">{{ number_format($it->sumYard, 2) }}</td>
                     <td>{{ $it->emp }}</td>
-                    <td class="text-center">
-                      <form method="POST"
-                            action="{{ route('fabriccheck.item.destroy', ['refId' => $refId, 'id' => $it->id]) }}"
-                            onsubmit="return confirm('ยืนยันลบพับที่ {{ $it->fold }} หรือไม่?');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
-                      </form>
+                    <td class="text-center action-cell">
+                      <div class="row-actions">
+                        <form method="POST"
+                              action="{{ route('fabriccheck.item.destroy', ['refId' => $refId, 'id' => $it->id]) }}"
+                              onsubmit="return confirm('ยืนยันลบพับที่ {{ $it->fold }} หรือไม่?');">
+                          @csrf
+                          @method('DELETE')
+                          <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                        </form>
+                      </div>
                     </td>
                   </tr>
                 @endforeach
