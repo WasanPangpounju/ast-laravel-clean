@@ -3,7 +3,7 @@
 @section('content')
 <div class="content-wrapper always-show-actions">
 
-  {{-- CSS: โชว์ปุ่ม/แอ็กชันตลอดเวลา โดย *ไม่* เปลี่ยนสี/พื้นหลังของธีมเดิม --}}
+  {{-- CSS: โชว์ปุ่มตลอด + กำหนดสีปุ่ม outline ให้เห็นได้ทันที (ไม่ต้อง hover) --}}
   <style>
     /* ให้ปุ่มและกล่องแอ็กชันมองเห็นตลอด */
     .always-show-actions .header-actions .btn,
@@ -16,22 +16,46 @@
       visibility: visible !important;
       filter: none !important;
     }
-    /* ให้ฟอร์มแอ็กชันเรียงในบรรทัด */
     .always-show-actions .header-actions form,
     .always-show-actions .action-cell form {
       display: inline-block !important;
       margin: 0 4px;
     }
-    /* กลุ่มปุ่มในเซลล์ */
     .always-show-actions .table .row-actions {
       display: inline-flex !important;
       gap: .25rem;
     }
-    /* กันปุ่มโดนตัดขอบ */
     .always-show-actions .table tbody tr td {
       overflow: visible !important;
     }
-    /* ไม่แตะต้องสี/พื้นหลัง — ปล่อยให้ธีมกำหนดเอง */
+
+    /* ✅ บังคับสีปุ่ม outline (สถานะปกติ) ให้เห็นทันทีโดยไม่ต้อง hover */
+    .always-show-actions .btn-outline-secondary,
+    .always-show-actions a.btn.btn-outline-secondary {
+      color: #6c757d !important;
+      border-color: #6c757d !important;
+      background-color: transparent !important;
+    }
+    .always-show-actions .btn-outline-danger,
+    .always-show-actions button.btn.btn-outline-danger {
+      color: #dc3545 !important;
+      border-color: #dc3545 !important;
+      background-color: transparent !important;
+    }
+
+    /* คงพฤติกรรม hover ตามสไตล์ Bootstrap */
+    .always-show-actions .btn-outline-secondary:hover,
+    .always-show-actions .btn-outline-secondary:focus {
+      color: #fff !important;
+      background-color: #6c757d !important;
+      border-color: #6c757d !important;
+    }
+    .always-show-actions .btn-outline-danger:hover,
+    .always-show-actions .btn-outline-danger:focus {
+      color: #fff !important;
+      background-color: #dc3545 !important;
+      border-color: #dc3545 !important;
+    }
   </style>
 
   {{-- Breadcrumb --}}
