@@ -119,30 +119,32 @@
             </div>
           </div>
 
-          {{-- ปุ่มนำทางแบบกำหนดเอง: ย้อนกลับ / ถัดไป --}}
-          @if ($rows->hasPages())
-            <div class="card-footer d-flex justify-content-between align-items-center">
-              <div class="btn-group">
-                @if ($rows->onFirstPage())
-                  <button class="btn btn-outline-secondary btn-sm" disabled>&laquo; ย้อนกลับ</button>
-                @else
-                  <a class="btn btn-outline-secondary btn-sm"
-                     href="{{ $rows->previousPageUrl() }}">&laquo; ย้อนกลับ</a>
-                @endif
+          {{-- ปุ่มนำทาง: ย้อนกลับ / ถัดไป (500 ต่อหน้า) --}}
+          <div class="card-footer d-flex justify-content-between align-items-center">
+            <div class="btn-group">
+              @if ($rows->onFirstPage())
+                <button class="btn btn-outline-secondary btn-sm" disabled>&laquo; ย้อนกลับ</button>
+              @else
+                <a class="btn btn-outline-secondary btn-sm" href="{{ $rows->previousPageUrl() }}">
+                  &laquo; ย้อนกลับ
+                </a>
+              @endif
 
-                <span class="mx-2 align-self-center">หน้า {{ $rows->currentPage() }}</span>
+              <span class="mx-2 align-self-center">หน้า {{ $rows->currentPage() }}</span>
 
-                @if ($rows->hasMorePages())
-                  <a class="btn btn-primary btn-sm"
-                     href="{{ $rows->nextPageUrl() }}">ถัดไป &raquo;</a>
-                @else
-                  <button class="btn btn-primary btn-sm" disabled>ถัดไป &raquo;</button>
-                @endif
-              </div>
-
-              <small class="text-muted">แสดง: {{ $rows->count() }} รายการต่อหน้า (ล่าสุดก่อน)</small>
+              @if ($rows->hasMorePages())
+                <a class="btn btn-primary btn-sm" href="{{ $rows->nextPageUrl() }}">
+                  ถัดไป &raquo;
+                </a>
+              @else
+                <button class="btn btn-primary btn-sm" disabled>ถัดไป &raquo;</button>
+              @endif
             </div>
-          @endif
+
+            <small class="text-muted">
+              แสดง: {{ $rows->count() }} รายการ / หน้า (ล่าสุดก่อน)
+            </small>
+          </div>
         </div>
       </div>
 
