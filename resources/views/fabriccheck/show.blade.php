@@ -1,25 +1,48 @@
 @extends('layouts.astmanufacturing')
 
 @section('content')
-<div class="content-wrapper">
+<div class="content-wrapper always-show-actions">
 
-  {{-- CSS: บังคับให้ปุ่ม/แอ็กชันแสดงตลอดเวลา --}}
+  {{-- CSS: ให้ปุ่ม/แอ็กชันแสดงตลอดเวลา (override ธีมที่ซ่อนตอนยังไม่ hover) --}}
   <style>
-    .header-actions .btn,
-    .action-cell .btn,
-    .action-cell .row-actions {
+    /* ส่วนหัว */
+    .always-show-actions .header-actions .btn,
+    .always-show-actions .header-actions form {
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: inline-block !important;
+    }
+    .always-show-actions .header-actions form { margin: 0 4px; }
+
+    /* ในตาราง */
+    .always-show-actions .table tbody tr td { overflow: visible !important; }
+    .always-show-actions .action-cell .row-actions {
+      display: inline-flex !important;
+      gap: .25rem;
       opacity: 1 !important;
       visibility: visible !important;
     }
-    .header-actions form,
-    .action-cell form {
-      display: inline-block;
-      margin: 0 4px;
+    .always-show-actions .action-cell .btn,
+    .always-show-actions .action-cell form {
+      display: inline-block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
     }
-    /* กันธีมบางตัวที่ซ่อนปุ่มในตารางจนกว่า hover */
-    .table .row-actions { 
-      display: inline-flex !important; 
-      gap: .25rem;
+    .always-show-actions .action-cell form { margin: 0 4px; }
+
+    /* กันเคสธีมที่ใช้ตัวเลือกแบบ hover เพื่อซ่อนปุ่ม */
+    .always-show-actions .table-hover tbody tr td .btn,
+    .always-show-actions .table-hover tbody tr td .btn-group,
+    .always-show-actions .table-hover tbody tr td .row-actions {
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: inline-flex !important;
+    }
+    .always-show-actions .table-hover tbody tr:hover td .btn,
+    .always-show-actions .table-hover tbody tr:hover td .btn-group,
+    .always-show-actions .table-hover tbody tr:hover td .row-actions {
+      opacity: 1 !important;
+      visibility: visible !important;
     }
   </style>
 
