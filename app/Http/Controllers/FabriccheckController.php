@@ -13,32 +13,48 @@ class FabriccheckController extends Controller
         $this->middleware('auth');
     }
 
+    // สรุปตาม Ref — 500 กลุ่มล่าสุด/หน้า (คิวรีเร็ว + paginate)
     public function index(Request $request)
     {
-        $summary = stockfabric::select([
-                'refId',
-                DB::raw('COUNT(*)        AS folds'),
-                DB::raw('SUM(sumYard)    AS yards'),
-                DB::raw('MAX(createDate) AS key_date'),
-                DB::raw('MAX(id)         AS last_id'),
-                DB::raw('MAX(emp)        AS emp'),
-                DB::raw('MAX(customer)   AS customer'),
-                DB::raw('MAX(fabricId)   AS fabricId'),
-                DB::raw('MAX(fabricStruct)   AS fabricStruct'),
-                DB::raw('MAX(fabricPattern)  AS fabricPattern'),
-                DB::raw('MAX(fabricW)    AS fabricW'),
-            ])
+        // ซับคิวรี: หา last_id ต่อ ref (ใช้ index (refId,id) ได้ดี) แล้วจำกัด 500 ชุดล่าสุด
+        $lastRefs = DB::table('stockfabrics')
+            ->select('refId', DB::raw('MAX(id) AS last_id'))
             ->groupBy('refId')
-            ->orderByDesc('last_id')
-            ->cursorPaginate(500);
+            ->orderByDesc(DB::raw('MAX(id)'))
+            ->limit(500);
+
+        // join กลับมาหา aggregate ต่อ ref เฉพาะ 500 ชุดนั้น
+        $summary = DB::table('stockfabrics as s')
+            ->joinSub($lastRefs, 'r', function ($j) {
+                $j->on('s.refId', '=', 'r.refId');
+            })
+            ->select([
+                's.refId',
+                DB::raw('COUNT(*)              AS folds'),
+                DB::raw('SUM(s.sumYard)        AS yards'),
+                DB::raw('MAX(s.createDate)     AS key_date'),
+                DB::raw('MAX(s.emp)            AS emp'),
+                DB::raw('MAX(s.customer)       AS customer'),
+                DB::raw('MAX(s.fabricId)       AS fabricId'),
+                DB::raw('MAX(s.fabricStruct)   AS fabricStruct'),
+                DB::raw('MAX(s.fabricPattern)  AS fabricPattern'),
+                DB::raw('MAX(s.fabricW)        AS fabricW'),
+                DB::raw('MAX(r.last_id)        AS last_id'),
+            ])
+            ->groupBy('s.refId', 'r.last_id')
+            ->orderByDesc('r.last_id')
+            ->paginate(500);
 
         return view('fabriccheck.index', ['rows' => $summary]);
     }
 
-    public function show($refId)
+    // รายละเอียดตาม Ref (Resource route จะส่งพารามิเตอร์ชื่อ {fabriccheck})
+    public function show($fabriccheck)
     {
+        $refId = $fabriccheck; // ตั้งชื่อให้ชัด
+
         $items = stockfabric::where('refId', $refId)
-            ->orderBy('fold', 'asc') // เรียงลำดับพับที่
+            ->orderBy('fold','asc')   // เรียงพับที่
             ->get();
 
         if ($items->isEmpty()) {
@@ -59,10 +75,10 @@ class FabriccheckController extends Controller
             'key_date'      => $first->createDate ?? $first->created_at,
         ];
 
-        return view('fabriccheck.show', compact('header', 'items'));
+        return view('fabriccheck.show', compact('header','items'));
     }
 
-    // ลบ “รายการเดี่ยว”
+    // ลบ “รายแถว”
     public function destroyItem(Request $request, $refId, $id)
     {
         $row = stockfabric::where('refId', $refId)->where('id', $id)->firstOrFail();
@@ -73,11 +89,10 @@ class FabriccheckController extends Controller
             ->with('status', "ลบพับที่ {$row->fold} (ID:{$row->id}) เรียบร้อย");
     }
 
-    // ลบ “ทั้ง ref”
-    public function destroyRef(Request $request, $refId)
+    // ลบ “ทั้ง ref” (แม็พกับ resource:destroy)
+    public function destroy($fabriccheck)
     {
-        // (ทางเลือก) ตรวจสิทธิ์ก่อนลบทั้งหมด
-        // $this->authorize('delete-all-stockfabric');
+        $refId = $fabriccheck;
 
         $count = stockfabric::where('refId', $refId)->count();
         stockfabric::where('refId', $refId)->delete();

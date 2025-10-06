@@ -61,7 +61,12 @@ Route::resource('ordershipped', OrdershippedController::class );
 Route::resource('stockfabric', StockfabricController::class );
 Route::resource('fabricout', FabricoutController::class );
 Route::resource('fabricdeposit', FabricdepositController::class );
+
+Route::delete('/fabriccheck/{refId}/items/{id}', [FabriccheckController::class, 'destroyItem'])
+    ->name('fabriccheck.item.destroy');
 Route::resource('fabriccheck', FabriccheckController::class );
+
+
 Route::resource('fabricoutdeposit', FabricoutDepositController::class );
 
 Route::post('generate-pdf', 'PDFController@generatePDF')->name('generate-pdf');

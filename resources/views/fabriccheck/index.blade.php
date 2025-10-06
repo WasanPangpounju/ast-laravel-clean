@@ -11,6 +11,16 @@
 
   <div class="content">
     <div class="container-fluid">
+
+      @if (session('status'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          {{ session('status') }}
+          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+      @endif
+
       <div class="card">
         <div class="card-body p-0">
           <div class="table-responsive">
@@ -33,7 +43,7 @@
               <tbody>
                 @forelse ($rows as $r)
                   <tr>
-                    <td class="text-center">{{ $loop->iteration }}</td>
+                    <td class="text-center">{{ ($rows->currentPage()-1)*$rows->perPage() + $loop->iteration }}</td>
                     <td>{{ $r->emp }}</td>
                     <td>{{ $r->customer }}</td>
                     <td class="text-nowrap">{{ $r->fabricId }}</td>
@@ -46,6 +56,7 @@
                       {{ \Carbon\Carbon::parse($r->key_date)->format('d/m/Y') }}
                     </td>
                     <td class="text-center">
+                      {{-- ใช้ route() เพื่อ encode param (+,= จะปลอดภัย) --}}
                       <a class="btn btn-primary btn-sm" href="{{ route('fabriccheck.show', $r->refId) }}">
                         ดูรายละเอียด
                       </a>
@@ -61,27 +72,7 @@
 
         @if ($rows->hasPages())
           <div class="card-footer d-flex justify-content-between align-items-center">
-            <div class="btn-group">
-              @if ($rows->previousCursor())
-                <a class="btn btn-outline-secondary btn-sm"
-                   href="{{ route('fabriccheck.index', ['cursor' => $rows->previousCursor()->encode()]) }}">
-                  &laquo; ก่อนหน้า
-                </a>
-              @else
-                <button class="btn btn-outline-secondary btn-sm" disabled>&laquo; ก่อนหน้า</button>
-              @endif
-
-              <a class="btn btn-outline-primary btn-sm" href="{{ route('fabriccheck.index') }}">หน้าแรก</a>
-
-              @if ($rows->nextCursor())
-                <a class="btn btn-primary btn-sm"
-                   href="{{ route('fabriccheck.index', ['cursor' => $rows->nextCursor()->encode()]) }}">
-                  ถัดไป &raquo;
-                </a>
-              @else
-                <button class="btn btn-primary btn-sm" disabled>ถัดไป &raquo;</button>
-              @endif
-            </div>
+            {{ $rows->onEachSide(1)->links() }}
             <small class="text-muted">แสดง: {{ $rows->count() }} Ref</small>
           </div>
         @endif

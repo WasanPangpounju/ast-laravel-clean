@@ -10,8 +10,8 @@
       </h1>
 
       <div class="d-flex gap-2">
-        {{-- ปุ่มลบทั้ง ref --}}
-        <form method="POST" action="{{ route('fabriccheck.ref.destroy', $header->refId) }}"
+        {{-- ลบทั้ง ref (ใช้ resource destroy) --}}
+        <form method="POST" action="{{ route('fabriccheck.destroy', $header->refId) }}"
               onsubmit="return confirm('ยืนยันลบรายการคีย์ของ Ref นี้ทั้งหมดหรือไม่?');" class="mr-2">
           @csrf
           @method('DELETE')
@@ -20,7 +20,6 @@
           </button>
         </form>
 
-        {{-- ปุ่มกลับไป index --}}
         <a href="{{ route('fabriccheck.index') }}" class="btn btn-outline-secondary btn-sm">กลับ</a>
       </div>
     </div>
@@ -29,7 +28,6 @@
   <div class="content">
     <div class="container-fluid">
 
-      {{-- Flash message --}}
       @if (session('status'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
           {{ session('status') }}
@@ -39,7 +37,6 @@
         </div>
       @endif
 
-      {{-- สรุปหัวตาราง --}}
       <div class="card mb-3">
         <div class="card-body">
           <div class="row">
@@ -54,14 +51,12 @@
             <div class="col-md-3"><strong>รวมพับ:</strong> {{ number_format($header->folds) }}</div>
             <div class="col-md-3"><strong>รวม(หลา):</strong> {{ number_format($header->yards, 2) }}</div>
             <div class="col-md-6">
-              <strong>วันที่คีย์:</strong>
-              {{ \Carbon\Carbon::parse($header->key_date)->format('d/m/Y') }}
+              <strong>วันที่คีย์:</strong> {{ \Carbon\Carbon::parse($header->key_date)->format('d/m/Y') }}
             </div>
           </div>
         </div>
       </div>
 
-      {{-- รายการพับทั้งหมดของ Ref --}}
       <div class="card">
         <div class="card-body p-0">
           <div class="table-responsive">
