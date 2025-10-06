@@ -8,12 +8,36 @@
         <i class="nav-icon fas fa-search"></i>
         รายละเอียดการคีย์ — Ref: <span class="text-monospace">{{ $header->refId }}</span>
       </h1>
-      <a href="{{ route('fabriccheck.index') }}" class="btn btn-outline-secondary btn-sm">ย้อนกลับ</a>
+
+      <div class="d-flex gap-2">
+        {{-- ปุ่มลบทั้ง ref --}}
+        <form method="POST" action="{{ route('fabriccheck.ref.destroy', $header->refId) }}"
+              onsubmit="return confirm('ยืนยันลบรายการคีย์ของ Ref นี้ทั้งหมดหรือไม่?');" class="mr-2">
+          @csrf
+          @method('DELETE')
+          <button type="submit" class="btn btn-danger btn-sm">
+            ลบรายการนี้ทั้งหมด
+          </button>
+        </form>
+
+        {{-- ปุ่มกลับไป index --}}
+        <a href="{{ route('fabriccheck.index') }}" class="btn btn-outline-secondary btn-sm">กลับ</a>
+      </div>
     </div>
   </div>
 
   <div class="content">
     <div class="container-fluid">
+
+      {{-- Flash message --}}
+      @if (session('status'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          {{ session('status') }}
+          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+      @endif
 
       {{-- สรุปหัวตาราง --}}
       <div class="card mb-3">
@@ -48,6 +72,7 @@
                   <th style="width: 140px;">วันที่คีย์</th>
                   <th>ยอด (หลา)</th>
                   <th>ผู้คีย์</th>
+                  <th style="width: 110px;">การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -59,6 +84,15 @@
                     </td>
                     <td class="text-right">{{ number_format($it->sumYard, 2) }}</td>
                     <td>{{ $it->emp }}</td>
+                    <td class="text-center">
+                      <form method="POST"
+                            action="{{ route('fabriccheck.item.destroy', ['refId' => $header->refId, 'id' => $it->id]) }}"
+                            onsubmit="return confirm('ยืนยันลบพับที่ {{ $it->fold }} (ID:{{ $it->id }}) หรือไม่?');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                      </form>
+                    </td>
                   </tr>
                 @endforeach
               </tbody>

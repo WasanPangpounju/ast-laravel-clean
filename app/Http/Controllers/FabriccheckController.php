@@ -13,7 +13,6 @@ class FabriccheckController extends Controller
         $this->middleware('auth');
     }
 
-    // 🧾 หน้าแสดงสรุปตาม Ref
     public function index(Request $request)
     {
         $summary = stockfabric::select([
@@ -36,30 +35,55 @@ class FabriccheckController extends Controller
         return view('fabriccheck.index', ['rows' => $summary]);
     }
 
-    // 📄 หน้าแสดงรายละเอียดของแต่ละ Ref
     public function show($refId)
     {
         $items = stockfabric::where('refId', $refId)
-            ->orderBy('fold')
+            ->orderBy('fold', 'asc') // เรียงลำดับพับที่
             ->get();
 
         if ($items->isEmpty()) {
             abort(404, 'ไม่พบข้อมูล Ref นี้');
         }
 
+        $first = $items->first();
         $header = (object)[
             'refId'         => $refId,
-            'emp'           => $items->first()->emp,
-            'customer'      => $items->first()->customer,
-            'fabricId'      => $items->first()->fabricId,
-            'fabricStruct'  => $items->first()->fabricStruct,
-            'fabricPattern' => $items->first()->fabricPattern,
-            'fabricW'       => $items->first()->fabricW,
+            'emp'           => $first->emp,
+            'customer'      => $first->customer,
+            'fabricId'      => $first->fabricId,
+            'fabricStruct'  => $first->fabricStruct,
+            'fabricPattern' => $first->fabricPattern,
+            'fabricW'       => $first->fabricW,
             'folds'         => $items->count(),
             'yards'         => $items->sum('sumYard'),
-            'key_date'      => $items->first()->createDate ?? $items->first()->created_at,
+            'key_date'      => $first->createDate ?? $first->created_at,
         ];
 
         return view('fabriccheck.show', compact('header', 'items'));
+    }
+
+    // ลบ “รายการเดี่ยว”
+    public function destroyItem(Request $request, $refId, $id)
+    {
+        $row = stockfabric::where('refId', $refId)->where('id', $id)->firstOrFail();
+        $row->delete();
+
+        return redirect()
+            ->route('fabriccheck.show', $refId)
+            ->with('status', "ลบพับที่ {$row->fold} (ID:{$row->id}) เรียบร้อย");
+    }
+
+    // ลบ “ทั้ง ref”
+    public function destroyRef(Request $request, $refId)
+    {
+        // (ทางเลือก) ตรวจสิทธิ์ก่อนลบทั้งหมด
+        // $this->authorize('delete-all-stockfabric');
+
+        $count = stockfabric::where('refId', $refId)->count();
+        stockfabric::where('refId', $refId)->delete();
+
+        return redirect()
+            ->route('fabriccheck.index')
+            ->with('status', "ลบข้อมูลทั้ง Ref {$refId} จำนวน {$count} แถวเรียบร้อย");
     }
 }
