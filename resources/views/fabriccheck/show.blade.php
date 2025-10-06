@@ -3,46 +3,55 @@
 @section('content')
 <div class="content-wrapper always-show-actions">
 
-  {{-- CSS: ให้ปุ่ม/แอ็กชันแสดงตลอดเวลา (override ธีมที่ซ่อนตอนยังไม่ hover) --}}
+  {{-- CSS: บังคับให้ปุ่ม/แอ็กชันแสดงตลอดเวลา และ “มีสี” ชัดเจน --}}
   <style>
-    /* ส่วนหัว */
+    /* ป้องกันธีมที่ซ่อนปุ่มไว้จนกว่าจะ hover */
     .always-show-actions .header-actions .btn,
-    .always-show-actions .header-actions form {
-      opacity: 1 !important;
-      visibility: visible !important;
-      display: inline-block !important;
-    }
-    .always-show-actions .header-actions form { margin: 0 4px; }
-
-    /* ในตาราง */
-    .always-show-actions .table tbody tr td { overflow: visible !important; }
-    .always-show-actions .action-cell .row-actions {
-      display: inline-flex !important;
-      gap: .25rem;
-      opacity: 1 !important;
-      visibility: visible !important;
-    }
     .always-show-actions .action-cell .btn,
+    .always-show-actions .action-cell .row-actions,
+    .always-show-actions .table tbody tr td .btn,
+    .always-show-actions .table tbody tr td .btn-group,
+    .always-show-actions .table tbody tr td .row-actions {
+      opacity: 1 !important;
+      visibility: visible !important;
+      filter: none !important;
+    }
+
+    /* ทำให้ element ต่าง ๆ แสดงเป็น block/inline-flex เสมอ */
+    .always-show-actions .header-actions form,
     .always-show-actions .action-cell form {
       display: inline-block !important;
-      opacity: 1 !important;
-      visibility: visible !important;
+      margin: 0 4px;
     }
-    .always-show-actions .action-cell form { margin: 0 4px; }
-
-    /* กันเคสธีมที่ใช้ตัวเลือกแบบ hover เพื่อซ่อนปุ่ม */
-    .always-show-actions .table-hover tbody tr td .btn,
-    .always-show-actions .table-hover tbody tr td .btn-group,
-    .always-show-actions .table-hover tbody tr td .row-actions {
-      opacity: 1 !important;
-      visibility: visible !important;
+    .always-show-actions .table .row-actions {
       display: inline-flex !important;
+      gap: .25rem;
     }
-    .always-show-actions .table-hover tbody tr:hover td .btn,
-    .always-show-actions .table-hover tbody tr:hover td .btn-group,
-    .always-show-actions .table-hover tbody tr:hover td .row-actions {
-      opacity: 1 !important;
-      visibility: visible !important;
+
+    /* ⚠️ สำคัญ: บังคับ “สีตัวอักษร/ขอบ/พื้นหลัง” ให้มองเห็น แม้ธีมจะทำให้โปร่งใสตอนยังไม่ hover */
+    /* Header buttons */
+    .always-show-actions .header-actions .btn-danger {
+      color: #fff !important;
+      background-color: #dc3545 !important;
+      border-color: #dc3545 !important;
+    }
+    .always-show-actions .header-actions .btn-outline-secondary {
+      color: #6c757d !important;
+      border-color: #6c757d !important;
+      background: transparent !important;
+    }
+
+    /* Row delete button (outline-danger) */
+    .always-show-actions .action-cell .btn-outline-danger,
+    .always-show-actions .table .btn-outline-danger {
+      color: #dc3545 !important;
+      border-color: #dc3545 !important;
+      background: transparent !important;
+    }
+
+    /* กันบางธีมที่ไปซ่อนปุ่มภายใน td ด้วย overflow */
+    .always-show-actions .table tbody tr td {
+      overflow: visible !important;
     }
   </style>
 
@@ -93,7 +102,7 @@
         </div>
       @endif
 
-      {{-- สรุปหัวตาราง (ไม่แสดง ref) --}}
+      {{-- สรุปหัวตาราง --}}
       <div class="card mb-3">
         <div class="card-body">
           <div class="row">
