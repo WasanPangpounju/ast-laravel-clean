@@ -16,14 +16,14 @@ class FabriccheckController extends Controller
     // สรุปตาม Ref — 500 กลุ่มล่าสุด/หน้า (คิวรีเร็ว + paginate)
     public function index(Request $request)
     {
-        // ซับคิวรี: หา last_id ต่อ ref (ใช้ index (refId,id) ได้ดี) แล้วจำกัด 500 ชุดล่าสุด
+        // เลือก 500 ref ล่าสุดก่อน
         $lastRefs = DB::table('stockfabrics')
             ->select('refId', DB::raw('MAX(id) AS last_id'))
             ->groupBy('refId')
             ->orderByDesc(DB::raw('MAX(id)'))
             ->limit(500);
 
-        // join กลับมาหา aggregate ต่อ ref เฉพาะ 500 ชุดนั้น
+        // รวมสรุปเฉพาะ 500 ref ล่าสุดนั้น
         $summary = DB::table('stockfabrics as s')
             ->joinSub($lastRefs, 'r', function ($j) {
                 $j->on('s.refId', '=', 'r.refId');
@@ -48,13 +48,14 @@ class FabriccheckController extends Controller
         return view('fabriccheck.index', ['rows' => $summary]);
     }
 
-    // รายละเอียดตาม Ref (Resource route จะส่งพารามิเตอร์ชื่อ {fabriccheck})
+    // รายละเอียดตาม Ref
     public function show($fabriccheck)
     {
-        $refId = $fabriccheck; // ตั้งชื่อให้ชัด
+        $refId = $fabriccheck;
 
         $items = stockfabric::where('refId', $refId)
-            ->orderBy('fold','asc')   // เรียงพับที่
+            // ✅ เรียงพับที่แบบตัวเลข (กัน 1,10,11,...,2,3)
+            ->orderByRaw('CAST(fold AS UNSIGNED) ASC')
             ->get();
 
         if ($items->isEmpty()) {
@@ -75,7 +76,7 @@ class FabriccheckController extends Controller
             'key_date'      => $first->createDate ?? $first->created_at,
         ];
 
-        return view('fabriccheck.show', compact('header','items'));
+        return view('fabriccheck.show', compact('header', 'items'));
     }
 
     // ลบ “รายแถว”
@@ -89,7 +90,7 @@ class FabriccheckController extends Controller
             ->with('status', "ลบพับที่ {$row->fold} (ID:{$row->id}) เรียบร้อย");
     }
 
-    // ลบ “ทั้ง ref” (แม็พกับ resource:destroy)
+    // ลบ “ทั้ง ref” (resource:destroy)
     public function destroy($fabriccheck)
     {
         $refId = $fabriccheck;

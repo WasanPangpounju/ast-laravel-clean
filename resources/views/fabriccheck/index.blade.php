@@ -56,7 +56,6 @@
                       {{ \Carbon\Carbon::parse($r->key_date)->format('d/m/Y') }}
                     </td>
                     <td class="text-center">
-                      {{-- ใช้ route() เพื่อ encode param (+,= จะปลอดภัย) --}}
                       <a class="btn btn-primary btn-sm" href="{{ route('fabriccheck.show', $r->refId) }}">
                         ดูรายละเอียด
                       </a>

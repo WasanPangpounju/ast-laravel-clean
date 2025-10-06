@@ -10,7 +10,7 @@
       </h1>
 
       <div class="d-flex gap-2">
-        {{-- ลบทั้ง ref (ใช้ resource destroy) --}}
+        {{-- ลบทั้ง ref (resource destroy) --}}
         <form method="POST" action="{{ route('fabriccheck.destroy', $header->refId) }}"
               onsubmit="return confirm('ยืนยันลบรายการคีย์ของ Ref นี้ทั้งหมดหรือไม่?');" class="mr-2">
           @csrf
@@ -19,7 +19,6 @@
             ลบรายการนี้ทั้งหมด
           </button>
         </form>
-
         <a href="{{ route('fabriccheck.index') }}" class="btn btn-outline-secondary btn-sm">กลับ</a>
       </div>
     </div>
@@ -37,6 +36,7 @@
         </div>
       @endif
 
+      {{-- สรุปหัวตาราง --}}
       <div class="card mb-3">
         <div class="card-body">
           <div class="row">
@@ -57,6 +57,7 @@
         </div>
       </div>
 
+      {{-- รายการพับทั้งหมดของ Ref --}}
       <div class="card">
         <div class="card-body p-0">
           <div class="table-responsive">
