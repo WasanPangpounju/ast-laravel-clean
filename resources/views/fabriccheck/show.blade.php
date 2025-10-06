@@ -63,7 +63,7 @@
         </form>
 
         {{-- ปุ่มกลับ --}}
-        <a href="{{ route('fabriccheck.index') }}" class="btn btn-outline-secondary btn-sm">กลับ</a>
+        <a href="{{ route('fabriccheck.index') }}" class="btn btn-danger btn-sm">กลับ</a>
       </div>
     </div>
   </div>
