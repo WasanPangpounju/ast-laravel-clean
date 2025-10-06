@@ -106,7 +106,6 @@
                         {{ \Carbon\Carbon::parse($r->key_date)->format('d/m/Y') }}
                       </td>
                       <td class="text-center">
-                        {{-- ยังลิงก์ด้วย ref ภายใน แต่ไม่แสดงให้ผู้ใช้เห็น --}}
                         <a class="btn btn-primary btn-sm" href="{{ route('fabriccheck.show', $r->refId) }}">
                           ดูรายละเอียด
                         </a>
@@ -120,10 +119,28 @@
             </div>
           </div>
 
+          {{-- ปุ่มนำทางแบบกำหนดเอง: ย้อนกลับ / ถัดไป --}}
           @if ($rows->hasPages())
             <div class="card-footer d-flex justify-content-between align-items-center">
-              {{ $rows->onEachSide(1)->links() }}
-              <small class="text-muted">แสดง: {{ $rows->count() }} รายการล่าสุด</small>
+              <div class="btn-group">
+                @if ($rows->onFirstPage())
+                  <button class="btn btn-outline-secondary btn-sm" disabled>&laquo; ย้อนกลับ</button>
+                @else
+                  <a class="btn btn-outline-secondary btn-sm"
+                     href="{{ $rows->previousPageUrl() }}">&laquo; ย้อนกลับ</a>
+                @endif
+
+                <span class="mx-2 align-self-center">หน้า {{ $rows->currentPage() }}</span>
+
+                @if ($rows->hasMorePages())
+                  <a class="btn btn-primary btn-sm"
+                     href="{{ $rows->nextPageUrl() }}">ถัดไป &raquo;</a>
+                @else
+                  <button class="btn btn-primary btn-sm" disabled>ถัดไป &raquo;</button>
+                @endif
+              </div>
+
+              <small class="text-muted">แสดง: {{ $rows->count() }} รายการต่อหน้า (ล่าสุดก่อน)</small>
             </div>
           @endif
         </div>
