@@ -132,7 +132,7 @@
                               onsubmit="return confirm('ยืนยันลบพับที่ {{ $it->fold }} หรือไม่?');">
                           @csrf
                           @method('DELETE')
-                          <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
+                          <button type="submit" class="btn btn-danger btn-sm">ลบ</button>
                         </form>
                       </div>
                     </td>
