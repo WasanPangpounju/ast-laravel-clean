@@ -13,17 +13,16 @@ class FabriccheckController extends Controller
         $this->middleware('auth');
     }
 
-    // สรุปตาม Ref — 500 กลุ่มล่าสุด/หน้า (คิวรีเร็ว + paginate)
+    // สรุปเป็น "ชุดรายการ" (ยังกลุ่มด้วย ref ภายใน แต่ไม่แสดง ref บน UI)
     public function index(Request $request)
     {
-        // เลือก 500 ref ล่าสุดก่อน
+        // เลือก 500 ชุดล่าสุด (อิง last_id ต่อ ref เพื่อประสิทธิภาพ)
         $lastRefs = DB::table('stockfabrics')
             ->select('refId', DB::raw('MAX(id) AS last_id'))
             ->groupBy('refId')
             ->orderByDesc(DB::raw('MAX(id)'))
             ->limit(500);
 
-        // รวมสรุปเฉพาะ 500 ref ล่าสุดนั้น
         $summary = DB::table('stockfabrics as s')
             ->joinSub($lastRefs, 'r', function ($j) {
                 $j->on('s.refId', '=', 'r.refId');
@@ -48,23 +47,22 @@ class FabriccheckController extends Controller
         return view('fabriccheck.index', ['rows' => $summary]);
     }
 
-    // รายละเอียดตาม Ref
+    // รายละเอียดของชุดรายการ (ไม่โชว์ ref บน UI)
     public function show($fabriccheck)
     {
         $refId = $fabriccheck;
 
         $items = stockfabric::where('refId', $refId)
-            // ✅ เรียงพับที่แบบตัวเลข (กัน 1,10,11,...,2,3)
-            ->orderByRaw('CAST(fold AS UNSIGNED) ASC')
+            ->orderByRaw('CAST(fold AS UNSIGNED) ASC') // เรียงพับที่เป็นตัวเลขจริง
             ->get();
 
         if ($items->isEmpty()) {
-            abort(404, 'ไม่พบข้อมูล Ref นี้');
+            abort(404, 'ไม่พบข้อมูลชุดนี้');
         }
 
         $first = $items->first();
         $header = (object)[
-            'refId'         => $refId,
+            // 'refId' ไม่ต้องใช้บน UI
             'emp'           => $first->emp,
             'customer'      => $first->customer,
             'fabricId'      => $first->fabricId,
@@ -76,10 +74,10 @@ class FabriccheckController extends Controller
             'key_date'      => $first->createDate ?? $first->created_at,
         ];
 
-        return view('fabriccheck.show', compact('header', 'items'));
+        return view('fabriccheck.show', compact('header', 'items', 'refId'));
     }
 
-    // ลบ “รายแถว”
+    // ลบ “รายการเดี่ยว”
     public function destroyItem(Request $request, $refId, $id)
     {
         $row = stockfabric::where('refId', $refId)->where('id', $id)->firstOrFail();
@@ -87,10 +85,10 @@ class FabriccheckController extends Controller
 
         return redirect()
             ->route('fabriccheck.show', $refId)
-            ->with('status', "ลบพับที่ {$row->fold} (ID:{$row->id}) เรียบร้อย");
+            ->with('status', "ลบพับที่ {$row->fold} เรียบร้อย");
     }
 
-    // ลบ “ทั้ง ref” (resource:destroy)
+    // ลบ “ทั้งชุด” (resource:destroy) — ไม่แสดงค่า ref ในข้อความ
     public function destroy($fabriccheck)
     {
         $refId = $fabriccheck;
@@ -100,6 +98,6 @@ class FabriccheckController extends Controller
 
         return redirect()
             ->route('fabriccheck.index')
-            ->with('status', "ลบข้อมูลทั้ง Ref {$refId} จำนวน {$count} แถวเรียบร้อย");
+            ->with('status', "ลบข้อมูลทั้งชุด จำนวน {$count} แถวเรียบร้อย");
     }
 }
