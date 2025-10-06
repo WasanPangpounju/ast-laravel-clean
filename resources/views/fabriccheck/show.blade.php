@@ -1,93 +1,19 @@
 @extends('layouts.astmanufacturing')
 
 @section('content')
-<div class="content-wrapper always-show-actions">
-
-  {{-- CSS: โชว์ปุ่มตลอดเวลา + รีเซ็ตสี/พื้นหลังกลับไปใช้ของธีมเดิม --}}
-  <style>
-    /* มองเห็นตลอด ไม่ต้อง hover */
-    .always-show-actions .header-actions .btn,
-    .always-show-actions .action-cell .btn,
-    .always-show-actions .action-cell .row-actions,
-    .always-show-actions .table tbody tr td .btn,
-    .always-show-actions .table tbody tr td .btn-group,
-    .always-show-actions .table tbody tr td .row-actions {
-      opacity: 1 !important;
-      visibility: visible !important;
-      filter: none !important;
-    }
-    .always-show-actions .header-actions form,
-    .always-show-actions .action-cell form {
-      display: inline-block !important;
-      margin: 0 4px;
-    }
-    .always-show-actions .table .row-actions {
-      display: inline-flex !important;
-      gap: .25rem;
-    }
-    .always-show-actions .table tbody tr td {
-      overflow: visible !important;
-    }
-
-    /* ✅ รีเซ็ต “ปุ่ม outline” ให้กลับไปใช้สี/พื้นหลังของธีมเดิม (แต่ยังโชว์ตลอด) */
-    .always-show-actions .btn-outline-secondary,
-    .always-show-actions a.btn.btn-outline-secondary,
-    .always-show-actions .btn-outline-danger,
-    .always-show-actions button.btn.btn-outline-danger {
-      color: revert !important;
-      border-color: revert !important;
-      background-color: revert !important;
-      box-shadow: revert !important;
-    }
-    /* ไม่แตะต้องสถานะ :hover เพื่อให้เอฟเฟกต์ของธีมเดิมทำงานตามปกติ */
-  </style>
-
-  {{-- Breadcrumb --}}
-  <div class="">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="/home">หน้าหลัก</a></li>
-      <li class="breadcrumb-item"><a href="{{ route('fabriccheck.index') }}">ตรวจสอบคีย์ผ้าเข้าสต็อก</a></li>
-      <li class="breadcrumb-item active">รายละเอียด</li>
-    </ol>
-  </div>
-
-  {{-- Header --}}
+<div class="content-wrapper">
   <div class="content-header">
-    <div class="container-fluid d-flex justify-content-between align-items-center header-actions">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
       <h1 class="m-0">
         <i class="nav-icon fas fa-search"></i>
-        รายละเอียดการคีย์
+        รายละเอียดการคีย์ — Ref: <span class="text-monospace">{{ $header->refId }}</span>
       </h1>
-
-      <div>
-        {{-- ลบทั้งชุด --}}
-        <form method="POST" action="{{ route('fabriccheck.destroy', $refId) }}"
-              onsubmit="return confirm('ยืนยันลบรายการคีย์ชุดนี้ทั้งหมดหรือไม่?');">
-          @csrf
-          @method('DELETE')
-          <button type="submit" class="btn btn-danger btn-sm">
-            ลบรายการนี้ทั้งหมด
-          </button>
-        </form>
-
-        {{-- ปุ่มกลับ --}}
-        <a href="{{ route('fabriccheck.index') }}" class="btn btn-outline-secondary btn-sm">กลับ</a>
-      </div>
+      <a href="{{ route('fabriccheck.index') }}" class="btn btn-outline-secondary btn-sm">ย้อนกลับ</a>
     </div>
   </div>
 
   <div class="content">
     <div class="container-fluid">
-
-      {{-- Flash message --}}
-      @if (session('status'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-          {{ session('status') }}
-          <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-      @endif
 
       {{-- สรุปหัวตาราง --}}
       <div class="card mb-3">
@@ -104,13 +30,14 @@
             <div class="col-md-3"><strong>รวมพับ:</strong> {{ number_format($header->folds) }}</div>
             <div class="col-md-3"><strong>รวม(หลา):</strong> {{ number_format($header->yards, 2) }}</div>
             <div class="col-md-6">
-              <strong>วันที่คีย์:</strong> {{ \Carbon\Carbon::parse($header->key_date)->format('d/m/Y') }}
+              <strong>วันที่คีย์:</strong>
+              {{ \Carbon\Carbon::parse($header->key_date)->format('d/m/Y') }}
             </div>
           </div>
         </div>
       </div>
 
-      {{-- รายการพับทั้งหมด --}}
+      {{-- รายการพับทั้งหมดของ Ref --}}
       <div class="card">
         <div class="card-body p-0">
           <div class="table-responsive">
@@ -121,7 +48,6 @@
                   <th style="width: 140px;">วันที่คีย์</th>
                   <th>ยอด (หลา)</th>
                   <th>ผู้คีย์</th>
-                  <th style="width: 140px;">การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,17 +59,6 @@
                     </td>
                     <td class="text-right">{{ number_format($it->sumYard, 2) }}</td>
                     <td>{{ $it->emp }}</td>
-                    <td class="text-center action-cell">
-                      <div class="row-actions">
-                        <form method="POST"
-                              action="{{ route('fabriccheck.item.destroy', ['refId' => $refId, 'id' => $it->id]) }}"
-                              onsubmit="return confirm('ยืนยันลบพับที่ {{ $it->fold }} หรือไม่?');">
-                          @csrf
-                          @method('DELETE')
-                          <button type="submit" class="btn btn-outline-danger btn-sm">ลบ</button>
-                        </form>
-                      </div>
-                    </td>
                   </tr>
                 @endforeach
               </tbody>
@@ -154,6 +69,5 @@
 
     </div>
   </div>
-
 </div>
 @endsection
