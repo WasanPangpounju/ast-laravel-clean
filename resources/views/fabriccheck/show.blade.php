@@ -3,9 +3,9 @@
 @section('content')
 <div class="content-wrapper always-show-actions">
 
-  {{-- CSS: โชว์ปุ่มตลอด + กำหนดสีปุ่ม outline ให้เห็นได้ทันที (ไม่ต้อง hover) --}}
+  {{-- CSS: โชว์ปุ่มตลอดเวลา + รีเซ็ตสี/พื้นหลังกลับไปใช้ของธีมเดิม --}}
   <style>
-    /* ให้ปุ่มและกล่องแอ็กชันมองเห็นตลอด */
+    /* มองเห็นตลอด ไม่ต้อง hover */
     .always-show-actions .header-actions .btn,
     .always-show-actions .action-cell .btn,
     .always-show-actions .action-cell .row-actions,
@@ -29,33 +29,17 @@
       overflow: visible !important;
     }
 
-    /* ✅ บังคับสีปุ่ม outline (สถานะปกติ) ให้เห็นทันทีโดยไม่ต้อง hover */
+    /* ✅ รีเซ็ต “ปุ่ม outline” ให้กลับไปใช้สี/พื้นหลังของธีมเดิม (แต่ยังโชว์ตลอด) */
     .always-show-actions .btn-outline-secondary,
-    .always-show-actions a.btn.btn-outline-secondary {
-      color: #6c757d !important;
-      border-color: #6c757d !important;
-      background-color: transparent !important;
-    }
+    .always-show-actions a.btn.btn-outline-secondary,
     .always-show-actions .btn-outline-danger,
     .always-show-actions button.btn.btn-outline-danger {
-      color: #dc3545 !important;
-      border-color: #dc3545 !important;
-      background-color: transparent !important;
+      color: revert !important;
+      border-color: revert !important;
+      background-color: revert !important;
+      box-shadow: revert !important;
     }
-
-    /* คงพฤติกรรม hover ตามสไตล์ Bootstrap */
-    .always-show-actions .btn-outline-secondary:hover,
-    .always-show-actions .btn-outline-secondary:focus {
-      color: #fff !important;
-      background-color: #6c757d !important;
-      border-color: #6c757d !important;
-    }
-    .always-show-actions .btn-outline-danger:hover,
-    .always-show-actions .btn-outline-danger:focus {
-      color: #fff !important;
-      background-color: #dc3545 !important;
-      border-color: #dc3545 !important;
-    }
+    /* ไม่แตะต้องสถานะ :hover เพื่อให้เอฟเฟกต์ของธีมเดิมทำงานตามปกติ */
   </style>
 
   {{-- Breadcrumb --}}
