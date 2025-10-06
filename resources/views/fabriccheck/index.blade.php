@@ -77,7 +77,7 @@
               <table class="table table-sm table-striped table-bordered mb-0">
                 <thead class="thead-light">
                   <tr class="text-center">
-                    <th style="width:60px;">#</th>
+                    <th style="width:60px;">NO</th>
                     <th>ผู้คีย์</th>
                     <th>ลูกค้า</th>
                     <th>รหัส</th>
