@@ -168,7 +168,7 @@
                                                     @csrf
                                                     <input type="hidden" name="fabricout_no"
                                                         value="{{ $findFabric->no }}">
-                                                    <input type="hidden" name="ref_id"
+                                                    <input type="text" name="ref_id"
                                                         value="{{ $findFabric->refId }}">
 
                                                     <button type="submit" class="btn b_order" name="submit"
