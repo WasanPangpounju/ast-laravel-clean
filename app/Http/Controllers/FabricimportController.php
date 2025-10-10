@@ -294,7 +294,57 @@ class FabricimportController extends Controller
         return view('fabricimport.check.index', ['rows' => $paginator]);
     }
 
-    public function checkShow($refId)
+    public function checkShow(Request $request, $refId)
+{
+    // ดึงเฉพาะ header แถวแรก (จงใจไม่ใช้ SUM/COUNT ก่อน เพื่อตัดประเด็น aggregation)
+    $first = Fabricimport::where('refId', $refId)
+        ->select('refId','emp','customer','fabricId','fabricStruct','fabricPattern','fabricW',
+                 'supplier_name','invoice_no','unit_price','dye_lot','location','SONumber','createDate')
+        ->orderBy('id')
+        ->first();
+
+    abort_if(!$first, 404, 'ไม่พบข้อมูลชุดนี้');
+
+    // รายการพับ — จำกัดสูงสุด 100 แถวกันเผื่อ (คุณมี 6 แถวอยู่แล้ว)
+    $items = Fabricimport::where('refId', $refId)
+        ->select('id','fold','sumYard','createDate','emp')
+        ->orderByRaw('CAST(fold AS UNSIGNED) ASC')
+        ->limit(100)
+        ->get();
+
+    // สรุปแบบเบาที่สุดใน PHP (6 แถว ไม่หน่วงแน่)
+    $totalFolds = $items->count();
+    $totalYards = $items->reduce(function($c, $r){
+        // sumYard เป็น varchar → แปลงตัวเลขแบบปลอดภัย
+        $v = (float) str_replace([',',' '], '', (string) $r->sumYard);
+        return $c + $v;
+    }, 0.0);
+
+    $header = (object)[
+        'refId'         => $refId,
+        'emp'           => $first->emp,
+        'customer'      => $first->customer,
+        'fabricId'      => $first->fabricId,
+        'fabricStruct'  => $first->fabricStruct,
+        'fabricPattern' => $first->fabricPattern,
+        'fabricW'       => $first->fabricW,
+        'supplier_name' => $first->supplier_name,
+        'invoice_no'    => $first->invoice_no,
+        'unit_price'    => $first->unit_price,
+        'dye_lot'       => $first->dye_lot,
+        'location'      => $first->location,
+        'SONumber'      => $first->SONumber,
+        'folds'         => $totalFolds,
+        'yards'         => $totalYards,
+        'total_cost'    => $first->unit_price ? ($totalYards * (float)$first->unit_price) : null,
+        'key_date'      => $first->createDate,
+    ];
+
+    // ใช้ view เดิมได้เลย
+    return view('fabricimport.check.show', compact('header', 'items', 'refId'));
+}
+
+    public function checkShow_backup($refId)
     {
         $items = Fabricimport::where('refId', $refId)
             ->select('id','refId','fold','sumYard','createDate','emp',
