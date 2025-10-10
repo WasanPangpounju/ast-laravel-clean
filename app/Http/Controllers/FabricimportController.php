@@ -6,8 +6,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
-use App\Models\fabricimport;     // คงรูปแบบชื่อ model ตามที่คุณใช้อยู่
-use App\Models\customer;         // คงรูปแบบชื่อ model ตามที่คุณใช้อยู่
+use App\Models\Fabricimport;   // ใช้ F ใหญ่ ตรงกับชื่อคลาส
+use App\Models\Customer;       // ใช้ C ใหญ่ ตรงกับชื่อคลาส
 use App\Models\AstPurchaseorder;
 use App\Models\FabricAst;
 
@@ -18,10 +18,9 @@ class FabricimportController extends Controller
         $this->middleware('auth');
     }
 
-    // ---------- (เดิม) หน้าเลือกข้อมูล + ช่องคีย์ 160 ช่อง ----------
+    // ---------- หน้าเลือกข้อมูล + ช่องคีย์ 160 ช่อง ----------
     public function create()
     {
-        // ดึง orders + fabric_w แบบเดียวกับ inventory.create เพื่อใช้ datalist
         $orders = AstPurchaseorder::select(
             'ast_purchaseorders.id',
             'ast_purchaseorders.customerName',
@@ -42,12 +41,11 @@ class FabricimportController extends Controller
         return view('fabricimport.create', compact('orders','customers'));
     }
 
-    // ---------- (เดิม) เก็บรอบ/ปิดรอบ ----------
+    // ---------- เก็บรอบ/ปิดรอบ ----------
     public function store(Request $request)
     {
         $action = $request->input('submit'); // nextData | endData
 
-        // validate header/spec
         $request->validate([
             'dt'             => ['required','string'], // dd/mm/yyyy
             'fabricId'       => ['required','string'],
@@ -64,11 +62,11 @@ class FabricimportController extends Controller
             'SONumber'       => ['nullable','string'],
         ]);
 
-        // parse date
+        // parse date (รับ d/m/Y หรือ d-m-Y)
         $dt = \DateTime::createFromFormat('d/m/Y', str_replace('-', '/', $request->dt));
         $dateYmd = $dt ? $dt->format('Y-m-d') : now()->toDateString();
 
-        // เก็บลง session เพื่อใช้ต่อเนื่องตอนกด nextData
+        // เก็บ header ลง session (ใช้ตอน nextData)
         session()->put([
             'dt'            => $dateYmd,
             'fabricId'      => $request->fabricId,
@@ -84,7 +82,7 @@ class FabricimportController extends Controller
             'SONumber'      => $request->SONumber,
         ]);
 
-        // เตรียม refId (เหมือนเดิม: สุ่ม base64 ตัด '/')
+        // เตรียม refId
         if (!session()->has('refId')) {
             $bytes  = random_bytes(32);
             $base64 = base64_encode($bytes);
@@ -93,7 +91,7 @@ class FabricimportController extends Controller
         }
         $refId = session('refId');
 
-        // อ่านค่าช่องคีย์
+        // เตรียมข้อมูล insert ทีละพับ
         $arr = $request->input('sumYard', []); // [foldNo => yards]
         $toInsert = [];
         $countNew = 0;
@@ -133,17 +131,17 @@ class FabricimportController extends Controller
         session()->put('endCount', $oldEnd + $countNew);
         session()->put('sum',     $oldSum + $sumNew);
 
-        // บันทึก batch
+        // บันทึก batch → ชื่อตารางจริงคือ 'fabricimport' (ไม่มี s)
         if (!empty($toInsert)) {
-            DB::table('fabricimports')->insert($toInsert);
+            DB::table('fabricimport')->insert($toInsert);
         }
 
         if ($action === 'nextData') {
-            return redirect()->route('fabricimport.create')->with('ok', 'บันทึกรายการเพิ่มแล้ว (ยังไม่ปิดเอกสาร)');
+            return redirect()->route('fabricimport.create')
+                ->with('ok', 'บันทึกรายการเพิ่มแล้ว (ยังไม่ปิดเอกสาร)');
         }
 
         if ($action === 'endData') {
-            // เคลียร์รอบ session และไปหน้า show รายการของ refId นี้
             $gotoRef = $refId;
 
             session()->forget([
@@ -157,19 +155,19 @@ class FabricimportController extends Controller
         return back();
     }
 
-    // ---------- (เดิม) แสดงรายการทั้งหมดใน refId เดียวกัน ----------
+    // ---------- แสดงรายการทั้งหมดใน refId เดียวกัน ----------
     public function show(string $refId)
     {
-        $rows = fabricimport::where('refId', $refId)->orderBy('fold')->get();
+        $rows = Fabricimport::where('refId', $refId)
+            ->orderBy('fold')
+            ->get();
 
         abort_if($rows->isEmpty(), 404);
 
-        // header สรุปรวม
         $first = $rows->first();
         $header = [
             'refId'         => $refId,
-            // ถ้า createDate เป็น string ให้ parse ผ่าน Carbon เมื่อจะแสดงผลใน blade
-            'createDate'    => $first->createDate,
+            'createDate'    => $first->createDate, // แปลงรูปแบบใน blade ตามต้องการ
             'supplier_name' => $first->supplier_name,
             'invoice_no'    => $first->invoice_no,
             'unit_price'    => $first->unit_price,
@@ -190,10 +188,10 @@ class FabricimportController extends Controller
         return view('fabricimport.show', compact('rows','header'));
     }
 
-    // ---------- (เดิม) list ตามใบ/เอกสาร (refId) ล่าสุด ----------
+    // ---------- list ตามใบ/เอกสาร (refId) ล่าสุด ----------
     public function index()
     {
-        $list = fabricimport::select(
+        $list = Fabricimport::select(
                 'refId',
                 DB::raw('MIN(createDate) as date'),
                 DB::raw('COUNT(*) as folds'),
@@ -208,23 +206,17 @@ class FabricimportController extends Controller
         return view('fabricimport.index', compact('list'));
     }
 
-    // ======================================================================
-    // ===============  เพิ่มใหม่: หน้าตรวจสอบ “คีย์ผ้าซื้อเข้า”  ===============
-    // ======================================================================
-
-    /**
-     * ตรวจสอบคีย์ผ้าซื้อเข้าสต็อก (สรุปเป็นกลุ่มละ refId) — แบ่งหน้า 500 กลุ่ม/หน้า
-     */
+    // ================== ตรวจสอบ “คีย์ผ้าซื้อเข้า” (สรุปเป็นชุด ๆ) ==================
     public function checkIndex(Request $request)
     {
         $perPage = 500;
         $page    = max(1, (int)$request->query('page', 1));
 
-        // นับจำนวนกลุ่ม (refId ที่ไม่ซ้ำ)
-        $totalGroups = DB::table('fabricimports')->distinct('refId')->count('refId');
+        // นับจำนวนกลุ่ม (refId ที่ไม่ซ้ำ) → ตารางจริง 'fabricimport'
+        $totalGroups = DB::table('fabricimport')->distinct('refId')->count('refId');
 
-        // 1) ดึง refId สำหรับหน้านี้ เรียงใหม่→เก่า โดยอิง MAX(id)
-        $refChunk = DB::table('fabricimports')
+        // 1) หา refId ของหน้านี้ (ใหม่→เก่า โดยอิง MAX(id))
+        $refChunk = DB::table('fabricimport')
             ->select('refId', DB::raw('MAX(id) AS last_id'))
             ->groupBy('refId')
             ->orderByDesc(DB::raw('MAX(id)'))
@@ -247,7 +239,7 @@ class FabricimportController extends Controller
         $lastIdMap = $refChunk->pluck('last_id', 'refId'); // [refId => last_id]
 
         // 2) สรุปเฉพาะกลุ่มในหน้านี้
-        $rawSummary = DB::table('fabricimports as f')
+        $rawSummary = DB::table('fabricimport as f')
             ->select([
                 'f.refId',
                 DB::raw('COUNT(*)             AS folds'),
@@ -268,7 +260,6 @@ class FabricimportController extends Controller
             ->groupBy('f.refId')
             ->get();
 
-        // เรียงตาม last_id ให้ตรงกับใหม่→เก่า
         $rows = $rawSummary->map(function ($row) use ($lastIdMap) {
                 $row->last_id = $lastIdMap[$row->refId] ?? null;
                 return $row;
@@ -276,7 +267,6 @@ class FabricimportController extends Controller
             ->sortByDesc('last_id')
             ->values();
 
-        // ทำ paginator ด้วยมือ
         $paginator = new LengthAwarePaginator(
             $rows,
             $totalGroups,
@@ -288,13 +278,10 @@ class FabricimportController extends Controller
         return view('fabricimport.check.index', ['rows' => $paginator]);
     }
 
-    /**
-     * หน้าแสดงรายละเอียด “ผ้าซื้อเข้า” ทั้งชุดตาม refId
-     */
     public function checkShow($refId)
     {
-        $items = fabricimport::where('refId', $refId)
-            ->orderByRaw('CAST(fold AS UNSIGNED) ASC') // เรียงพับแบบตัวเลข
+        $items = Fabricimport::where('refId', $refId)
+            ->orderByRaw('CAST(fold AS UNSIGNED) ASC')
             ->get();
 
         if ($items->isEmpty()) {
@@ -328,12 +315,9 @@ class FabricimportController extends Controller
         return view('fabricimport.check.show', compact('header', 'items', 'refId'));
     }
 
-    /**
-     * ลบ “แถวเดียว” ในชุดซื้อเข้า
-     */
     public function checkDestroyItem(Request $request, $refId, $id)
     {
-        $row = fabricimport::where('refId', $refId)->where('id', $id)->firstOrFail();
+        $row = Fabricimport::where('refId', $refId)->where('id', $id)->firstOrFail();
         $row->delete();
 
         return redirect()
@@ -341,13 +325,10 @@ class FabricimportController extends Controller
             ->with('status', "ลบพับที่ {$row->fold} แล้ว");
     }
 
-    /**
-     * ลบ “ทั้งชุด” ของผ้าซื้อเข้า ตาม refId
-     */
     public function checkDestroy($refId)
     {
-        $count = fabricimport::where('refId', $refId)->count();
-        fabricimport::where('refId', $refId)->delete();
+        $count = Fabricimport::where('refId', $refId)->count();
+        Fabricimport::where('refId', $refId)->delete();
 
         return redirect()
             ->route('fabricimport.check.index')
