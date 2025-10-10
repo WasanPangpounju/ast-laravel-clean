@@ -219,8 +219,10 @@
 
                                 <div class="form-group">
                                     <label for="unit_price">ราคาซื้อต่อหลา 💵</label>
-                                    <input type="number" step="0.01" name="unit_price" class="form-control" id="unit_price"
-                                           placeholder="0.00" value="{{ $unit_price }}">
+                                    <!-- <input type="number" step="0.01" name="unit_price" class="form-control" id="unit_price"
+                                           placeholder="0.00" value="{{ $unit_price }}"> -->
+                                           <input type="text" name="unitPrice" ...>
+
                                 </div>
 
                                 <div class="form-group">
