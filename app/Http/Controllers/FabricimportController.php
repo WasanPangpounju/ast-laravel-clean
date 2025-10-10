@@ -294,69 +294,8 @@ class FabricimportController extends Controller
         return view('fabricimport.check.index', ['rows' => $paginator]);
     }
 
-    public function checkShow(Request $request, $refId)
-{
-    // toggle โหมดวิวเบา: เพิ่ม ?_plain=1 ที่ท้าย URL
-    $plain = $request->query('_plain') === '1';
-
-    // 1) ดึง header เฉพาะแถวแรก + เลือกเฉพาะคอลัมน์ที่ใช้
-    $first = \App\Models\Fabricimport::where('refId', $refId)
-        ->select(
-            'refId','emp','customer','fabricId','fabricStruct','fabricPattern','fabricW',
-            'supplier_name','invoice_no','unit_price','dye_lot','location','SONumber','createDate'
-        )
-        ->orderBy('id')
-        ->first();
-
-    if (!$first) {
-        abort(404, 'ไม่พบข้อมูลชุดนี้');
-    }
-
-    // 2) ดึงรายการพับ — fold/sumYard เป็น varchar → เรียงเป็นตัวเลข + limit กันพลาด
-    $items = \App\Models\Fabricimport::where('refId', $refId)
-        ->select('id','fold','sumYard','createDate','emp')
-        ->orderByRaw('CAST(fold AS UNSIGNED) ASC')
-        ->limit(500)
-        ->get();
-
-    // 3) รวมยอดแบบเบาใน PHP (sumYard varchar → float)
-    $totalFolds = $items->count();
-    $totalYards = 0.0;
-    foreach ($items as $r) {
-        $totalYards += (float) str_replace([',',' '], '', (string) $r->sumYard);
-    }
-
-    // 4) header สำหรับแสดงผล
-    $header = (object)[
-        'refId'         => $refId,
-        'emp'           => $first->emp,
-        'customer'      => $first->customer,
-        'fabricId'      => $first->fabricId,
-        'fabricStruct'  => $first->fabricStruct,
-        'fabricPattern' => $first->fabricPattern,
-        'fabricW'       => $first->fabricW,
-        'supplier_name' => $first->supplier_name,
-        'invoice_no'    => $first->invoice_no,
-        'unit_price'    => $first->unit_price,
-        'dye_lot'       => $first->dye_lot,
-        'location'      => $first->location,
-        'SONumber'      => $first->SONumber,
-        'folds'         => $totalFolds,
-        'yards'         => $totalYards,
-        'total_cost'    => $first->unit_price ? ($totalYards * (float)$first->unit_price) : null,
-        'key_date'      => $first->createDate,
-    ];
-
-    // 5) โหมดวิวเบา (ทดสอบตัด layout ออก)
-    if ($plain) {
-        return view('fabricimport.check.show-plain', compact('header','items','refId'));
-    }
-
-    // 6) โหมดปกติ
-    return view('fabricimport.check.show', compact('header','items','refId'));
-}
-
-    public function checkShow_backup($refId)
+    
+    public function checkShow($refId)
     {
         $items = Fabricimport::where('refId', $refId)
             ->select('id','refId','fold','sumYard','createDate','emp',
@@ -402,7 +341,8 @@ class FabricimportController extends Controller
             'key_date'      => $first->createDate ?? $first->created_at,
         ];
 
-        return view('fabricimport.check.show', compact('header', 'items', 'refId'));
+        // return view('fabricimport.check.show', compact('header', 'items', 'refId'));
+print($refId);
     }
 
     public function checkDestroyItem(Request $request, $refId, $id)
