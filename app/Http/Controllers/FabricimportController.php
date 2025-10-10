@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 use App\Models\Fabricimport;   // F ใหญ่ให้ตรงกับชื่อคลาส/ไฟล์
-use App\Models\Customer;       // C ใหญ่ให้ตรงกับชื่อคลาส/ไฟล์
+use App\Models\customer;       // C ใหญ่ให้ตรงกับชื่อคลาส/ไฟล์
 use App\Models\AstPurchaseorder;
 use App\Models\FabricAst;
 

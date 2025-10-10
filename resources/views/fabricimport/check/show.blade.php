@@ -54,7 +54,7 @@
         <a href="{{ route('fabricimport.check.index') }}" class="btn b_order">กลับ</a>
 
         {{-- (ตัวช่วย debug) เปิดหน้าแบบเบา ไม่ผ่าน layout --}}
-        <a href="{{ request()->url() }}?_plain=1" class="btn btn-secondary btn-sm">โหมดเบา (ทดสอบ)</a>
+{{--        <a href="{{ request()->url() }}?_plain=1" class="btn btn-secondary btn-sm">โหมดเบา (ทดสอบ)</a> --}}
       </div>
     </div>
   </div>
