@@ -163,17 +163,14 @@
                                             <td>{{ $findFabric->foldCount }}</td>
                                             <td>{{ $findFabric->sumYardSum }}</td>
                                             <td>
-                                                <form action="{{ route('fabricout.store') }}" method="post" target="_blank">
-  @csrf
-  <input type="hidden" name="fabricout_no" value="{{ $findFabric->no }}">
-  <input type="hidden" name="vat_type"     value="{{ $findFabric->vatType }}">
-  <input type="hidden" name="vat_no"       value="{{ $findFabric->vatNo }}">
-  <input type="hidden" name="ref_id"       value="{{ $findFabric->refId }}">
-  <button type="submit" class="btn b_order" name="submit" value="submitfabricout">
-    สั่งใบส่ง
-  </button>
-</form>
-
+  <form action="{{ route('fabricout.store') }}" method="post" target="_blank">
+    @csrf
+    <input type="hidden" name="ref_id" value="{{ $findFabric->refId }}">
+    <button type="submit" class="btn b_order" name="submit" value="submitfabricout">
+      สั่งใบส่ง
+    </button>
+  </form>
+  
                                                 <form action="{{ route('fabricout.store') }}" method="post"
                                                     target="_blank">
                                                     @csrf
