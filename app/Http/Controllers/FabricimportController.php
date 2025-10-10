@@ -296,29 +296,35 @@ class FabricimportController extends Controller
 
     public function checkShow(Request $request, $refId)
 {
-    // ดึงเฉพาะ header แถวแรก (จงใจไม่ใช้ SUM/COUNT ก่อน เพื่อตัดประเด็น aggregation)
-    $first = Fabricimport::where('refId', $refId)
-        ->select('refId','emp','customer','fabricId','fabricStruct','fabricPattern','fabricW',
-                 'supplier_name','invoice_no','unit_price','dye_lot','location','SONumber','createDate')
+    // 1) เปิดโหมด JSON เพื่อตัด view/layout ออกจากสมการ (ทดสอบด้วย ?_json=1)
+    $asJson = (string) $request->query('_json', '0') === '1';
+
+    // 2) ดึง “header” เฉพาะแถวแรก (เลือกเฉพาะคอลัมน์ที่ต้องใช้)
+    $first = \App\Models\Fabricimport::where('refId', $refId)
+        ->select(
+            'refId','emp','customer','fabricId','fabricStruct','fabricPattern','fabricW',
+            'supplier_name','invoice_no','unit_price','dye_lot','location','SONumber','createDate'
+        )
         ->orderBy('id')
         ->first();
 
-    abort_if(!$first, 404, 'ไม่พบข้อมูลชุดนี้');
+    if (!$first) {
+        abort(404, 'ไม่พบข้อมูลชุดนี้');
+    }
 
-    // รายการพับ — จำกัดสูงสุด 100 แถวกันเผื่อ (คุณมี 6 แถวอยู่แล้ว)
-    $items = Fabricimport::where('refId', $refId)
+    // 3) ดึงรายการพับ (จำกัด 200 แถวเพื่อกันพลาด; คุณมีแค่ 6 แถว)
+    $items = \App\Models\Fabricimport::where('refId', $refId)
         ->select('id','fold','sumYard','createDate','emp')
         ->orderByRaw('CAST(fold AS UNSIGNED) ASC')
-        ->limit(100)
+        ->limit(200)
         ->get();
 
-    // สรุปแบบเบาที่สุดใน PHP (6 แถว ไม่หน่วงแน่)
+    // 4) รวมแบบเบามากใน PHP (sumYard เป็น varchar → แปลงก่อน)
     $totalFolds = $items->count();
-    $totalYards = $items->reduce(function($c, $r){
-        // sumYard เป็น varchar → แปลงตัวเลขแบบปลอดภัย
-        $v = (float) str_replace([',',' '], '', (string) $r->sumYard);
-        return $c + $v;
-    }, 0.0);
+    $totalYards = 0.0;
+    foreach ($items as $r) {
+        $totalYards += (float) str_replace([',',' '], '', (string) $r->sumYard);
+    }
 
     $header = (object)[
         'refId'         => $refId,
@@ -340,7 +346,17 @@ class FabricimportController extends Controller
         'key_date'      => $first->createDate,
     ];
 
-    // ใช้ view เดิมได้เลย
+    // 5) ถ้าเป็นโหมด JSON → ตัด Blade ออกไปเลย เพื่อตรวจว่าคอขวดอยู่ที่ view หรือไม่
+    if ($asJson) {
+        return response()->json([
+            'ok' => true,
+            'refId' => $refId,
+            'header' => $header,
+            'items' => $items,
+        ]);
+    }
+
+    // 6) โหมดปกติ → ส่งเข้า view ตามเดิม
     return view('fabricimport.check.show', compact('header', 'items', 'refId'));
 }
 
