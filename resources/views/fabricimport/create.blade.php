@@ -223,17 +223,19 @@
                                            placeholder="0.00" value="{{ $unit_price }}"> -->
                                            <!-- <input type="text" name="unitPrice" ...> -->
 
-                                             <input
-    type="number"
-    step="0.01"
-    name="unit_price"
-    id="unit_price"
-    class="form-control"
-    placeholder="0.00"
-    value="{{ $unit_price }}"
-    inputmode="decimal"
-    lang="en"
-    oninput="this.value = this.value.replace(',', '.')" />
+                                           <input
+  type="number"
+  step="0.01"
+  name="unit_price"
+  id="unit_price"
+  class="form-control"
+  placeholder="0.00"
+  value="{{ $unit_price }}"
+  inputmode="decimal"
+  lang="en"
+  maxlength="10"
+  oninput="this.value = this.value.replace(',', '.')" />
+ 
                                 </div>
 
                                 <div class="form-group">
