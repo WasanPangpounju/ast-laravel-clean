@@ -357,7 +357,8 @@ class FabricimportController extends Controller
     }
 
     // 6) โหมดปกติ → ส่งเข้า view ตามเดิม
-    return view('fabricimport.check.show', compact('header', 'items', 'refId'));
+    // return view('fabricimport.check.show', compact('header', 'items', 'refId'));
+    print(refId);
 }
 
     public function checkShow_backup($refId)
