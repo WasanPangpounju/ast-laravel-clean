@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
-use App\Models\Fabricimport;   // ใช้ F ใหญ่ ตรงกับชื่อคลาส db
+use App\Models\Fabricimport;   // ใช้ F ใหญ่ ตรงกับชื่อคลาส
 use App\Models\customer;       // ใช้ C ใหญ่ ตรงกับชื่อคลาส
 use App\Models\AstPurchaseorder;
 use App\Models\FabricAst;
