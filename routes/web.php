@@ -57,6 +57,23 @@ Route::resource('materialoutside', MaterialOutsideController::class );
 Route::resource('manufacture', ManufactureController::class );
 Route::resource('inventory', InventoryController::class );
 Route::resource('fabricimport', FabricimportController::class );
+
+// ตรวจสอบคีย์ผ้าซื้อเข้าสต็อก (สรุปเป็นกลุ่ม refId)
+Route::get('/fabricimport-check', [FabricimportController::class, 'checkIndex'])
+    ->name('fabricimport.check.index');
+
+// หน้ารายละเอียดชุดตาม refId
+Route::get('/fabricimport-check/{refId}', [FabricimportController::class, 'checkShow'])
+    ->name('fabricimport.check.show');
+
+// ลบ “แถวเดียว” ในชุดซื้อเข้า
+Route::delete('/fabricimport-check/{refId}/items/{id}', [FabricimportController::class, 'checkDestroyItem'])
+    ->name('fabricimport.check.destroyItem');
+
+// ลบ “ทั้งชุด” ตาม refId
+Route::delete('/fabricimport-check/{refId}', [FabricimportController::class, 'checkDestroy'])
+    ->name('fabricimport.check.destroy');
+
 Route::resource('ordershipped', OrdershippedController::class );
 Route::resource('stockfabric', StockfabricController::class );
 Route::resource('fabricout', FabricoutController::class );
