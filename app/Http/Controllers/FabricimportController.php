@@ -1,8 +1,8 @@
-// app/Http/Controllers/FabricImportController.php
+<?php
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 use App\Models\fabricimport;
 use App\Models\customer;
