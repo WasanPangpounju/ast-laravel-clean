@@ -116,7 +116,7 @@
             </div>
           </div>
           <div class="card-footer d-flex justify-content-between">
-            <a href="{{ route('fabricimport.index') }}" class="btn btn-outline-secondary">
+            <a href="{{ route('fabricimport.check.index') }}" class="btn btn-outline-secondary">
               &laquo; กลับหน้ารายการใบซื้อเข้า
             </a>
             <div>

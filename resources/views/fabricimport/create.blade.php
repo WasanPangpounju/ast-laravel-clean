@@ -166,7 +166,7 @@
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="customerInput">ลูกค้า (หากเป็นผ้าฝากผลิต)</label>
+                                        <label for="customerInput">ลูกค้า (ซื้อเพื่อขายต่อ)</label>
                                         <input type="text" name="customer" list="brow2" id="customerInput"
                                                class="form-control" placeholder="ลูกค้า" value="{{ $customer }}">
                                         <datalist id="brow2">
