@@ -6,8 +6,8 @@ use Illuminate\Support\Facades\DB;
 
 use App\Models\fabricimport;
 use App\Models\customer;
-use App\Models\astpurchaseorder; // สำหรับ datalist เดิม
-use App\Models\fabricast;        // เอา fabric_w ประกอบ (ถ้าใช้)
+use App\Models\AstPurchaseorder;
+use App\Models\FabricAst;
 
 class FabricimportController extends Controller
 {
