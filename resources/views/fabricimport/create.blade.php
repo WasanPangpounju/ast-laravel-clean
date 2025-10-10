@@ -219,10 +219,7 @@
 
                                 <div class="form-group">
                                     <label for="unit_price">ราคาซื้อต่อหลา 💵</label>
-                                    <!-- <input type="number" step="0.01" name="unit_price" class="form-control" id="unit_price"
-                                           placeholder="0.00" value="{{ $unit_price }}"> -->
-                                           <!-- <input type="text" name="unitPrice" ...> -->
-
+ 
                                            <input
   type="number"
   step="0.01"
@@ -239,7 +236,7 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <label for="dye_lot">ล็อตย้อม/การผลิต (Dye Lot) 🧪</label>
+                                    <label for="dye_lot">ล็อต/การผลิต (Dye Lot) 🧪</label>
                                     <input type="text" name="dye_lot" class="form-control" id="dye_lot"
                                            placeholder="Lot A, B, C..." value="{{ $dye_lot }}">
                                 </div>
