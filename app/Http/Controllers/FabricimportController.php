@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-use App\Models\FabricImport;
+use App\Models\fabricimport;
 use App\Models\customer;
 //use App\Models\astpurchaseorder; // สำหรับ datalist เดิม
 //use App\Models\fabricast;        // เอา fabric_w ประกอบ (ถ้าใช้)
