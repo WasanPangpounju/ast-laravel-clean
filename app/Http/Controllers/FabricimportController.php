@@ -5,9 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
-
-use App\Models\Fabricimport;   // ใช้ F ใหญ่ ตรงกับชื่อคลาส
-use App\Models\customer;       // ใช้ C ใหญ่ ตรงกับชื่อคลาส
+use App\Models\Fabricimport;
+use App\Models\Customer;
 use App\Models\AstPurchaseorder;
 use App\Models\FabricAst;
 
@@ -18,7 +17,7 @@ class FabricimportController extends Controller
         $this->middleware('auth');
     }
 
-    // ---------- หน้าเลือกข้อมูล + ช่องคีย์ 160 ช่อง ----------
+    // ---------- หน้าเลือกข้อมูล + ช่องคีย์ ----------
     public function create()
     {
         $orders = AstPurchaseorder::select(
@@ -41,19 +40,18 @@ class FabricimportController extends Controller
         return view('fabricimport.create', compact('orders','customers'));
     }
 
-    // ---------- เก็บรอบ/ปิดรอบ ----------
+    // ---------- บันทึก ----------
     public function store(Request $request)
     {
         $action = $request->input('submit'); // nextData | endData
 
         $request->validate([
-            'dt'             => ['required','string'], // dd/mm/yyyy
+            'dt'             => ['required','string'],
             'fabricId'       => ['required','string'],
             'fabricStruct'   => ['required','string'],
             'fabricPattern'  => ['nullable','string'],
             'fabricW'        => ['required','string'],
             'customer'       => ['nullable','string'],
-
             'supplier_name'  => ['required','string'],
             'invoice_no'     => ['required','string'],
             'unit_price'     => ['nullable','numeric'],
@@ -62,11 +60,9 @@ class FabricimportController extends Controller
             'SONumber'       => ['nullable','string'],
         ]);
 
-        // parse date (รับ d/m/Y หรือ d-m-Y)
         $dt = \DateTime::createFromFormat('d/m/Y', str_replace('-', '/', $request->dt));
         $dateYmd = $dt ? $dt->format('Y-m-d') : now()->toDateString();
 
-        // เก็บ header ลง session (ใช้ตอน nextData)
         session()->put([
             'dt'            => $dateYmd,
             'fabricId'      => $request->fabricId,
@@ -82,7 +78,6 @@ class FabricimportController extends Controller
             'SONumber'      => $request->SONumber,
         ]);
 
-        // เตรียม refId
         if (!session()->has('refId')) {
             $bytes  = random_bytes(32);
             $base64 = base64_encode($bytes);
@@ -91,8 +86,7 @@ class FabricimportController extends Controller
         }
         $refId = session('refId');
 
-        // เตรียมข้อมูล insert ทีละพับ
-        $arr = $request->input('sumYard', []); // [foldNo => yards]
+        $arr = $request->input('sumYard', []);
         $toInsert = [];
         $countNew = 0;
         $sumNew   = 0;
@@ -108,8 +102,8 @@ class FabricimportController extends Controller
                 'emp'           => auth()->user()->name,
                 'fabricStruct'  => session('fabricStruct'),
                 'fabricW'       => session('fabricW'),
-                'fold'          => (int)$foldNo,
-                'sumYard'       => (float)$yards,
+                'fold'          => (string)$foldNo,
+                'sumYard'       => (string)$yards,
                 'createDate'    => session('dt'),
                 'fabricPattern' => session('fabricPattern'),
                 'customer'      => session('customer'),
@@ -125,13 +119,11 @@ class FabricimportController extends Controller
             ];
         }
 
-        // อัปเดตตัวนับบน session (แสดงผลในหน้า)
         $oldEnd = (int) session('endCount', 0);
         $oldSum = (float) session('sum', 0);
         session()->put('endCount', $oldEnd + $countNew);
         session()->put('sum',     $oldSum + $sumNew);
 
-        // บันทึก batch → ชื่อตารางจริงคือ 'fabricimport' (ไม่มี s)
         if (!empty($toInsert)) {
             DB::table('fabricimport')->insert($toInsert);
         }
@@ -143,79 +135,24 @@ class FabricimportController extends Controller
 
         if ($action === 'endData') {
             $gotoRef = $refId;
-
             session()->forget([
                 'refId','endCount','sum','dt','fabricId','fabricStruct','fabricPattern','fabricW','customer',
                 'supplier_name','invoice_no','unit_price','dye_lot','location','SONumber'
             ]);
-
             return redirect()->route('fabricimport.show', $gotoRef);
         }
 
         return back();
     }
 
-    // ---------- แสดงรายการทั้งหมดใน refId เดียวกัน ----------
-    public function show(string $refId)
-    {
-        $rows = Fabricimport::where('refId', $refId)
-            ->orderBy('fold')
-            ->get();
-
-        abort_if($rows->isEmpty(), 404);
-
-        $first = $rows->first();
-        $header = [
-            'refId'         => $refId,
-            'createDate'    => $first->createDate, // แปลงรูปแบบใน blade ตามต้องการ
-            'supplier_name' => $first->supplier_name,
-            'invoice_no'    => $first->invoice_no,
-            'unit_price'    => $first->unit_price,
-            'dye_lot'       => $first->dye_lot,
-            'location'      => $first->location,
-            'SONumber'      => $first->SONumber,
-            'emp'           => $first->emp,
-            'fabricId'      => $first->fabricId,
-            'fabricStruct'  => $first->fabricStruct,
-            'fabricPattern' => $first->fabricPattern,
-            'fabricW'       => $first->fabricW,
-            'customer'      => $first->customer,
-            'total_folds'   => $rows->count(),
-            'total_yards'   => $rows->sum('sumYard'),
-            'total_cost'    => $first->unit_price ? $rows->sum('sumYard') * $first->unit_price : null,
-        ];
-
-        return view('fabricimport.show', compact('rows','header'));
-    }
-
-    // ---------- list ตามใบ/เอกสาร (refId) ล่าสุด ----------
-    public function index()
-    {
-        $list = Fabricimport::select(
-                'refId',
-                DB::raw('MIN(createDate) as date'),
-                DB::raw('COUNT(*) as folds'),
-                DB::raw('SUM(sumYard) as yards'),
-                DB::raw('MAX(supplier_name) as supplier'),
-                DB::raw('MAX(invoice_no) as invoice_no')
-            )
-            ->groupBy('refId')
-            ->orderByDesc('date')
-            ->paginate(20);
-
-        return view('fabricimport.index', compact('list'));
-    }
-
-    // ================== ตรวจสอบ “คีย์ผ้าซื้อเข้า” (สรุปเป็นชุด ๆ) ==================
+    // ---------- checkIndex ----------
     public function checkIndex(Request $request)
     {
         $perPage = 500;
         $page    = max(1, (int)$request->query('page', 1));
 
-        // นับจำนวนกลุ่ม (refId ที่ไม่ซ้ำ) → ตารางจริง 'fabricimport'
         $totalGroups = DB::table('fabricimport')->distinct('refId')->count('refId');
 
-        // 1) หา refId ของหน้านี้ (ใหม่→เก่า โดยอิง MAX(id))
         $refChunk = DB::table('fabricimport')
             ->select('refId', DB::raw('MAX(id) AS last_id'))
             ->groupBy('refId')
@@ -236,25 +173,24 @@ class FabricimportController extends Controller
         }
 
         $refIds    = $refChunk->pluck('refId')->all();
-        $lastIdMap = $refChunk->pluck('last_id', 'refId'); // [refId => last_id]
+        $lastIdMap = $refChunk->pluck('last_id', 'refId');
 
-        // 2) สรุปเฉพาะกลุ่มในหน้านี้
         $rawSummary = DB::table('fabricimport as f')
             ->select([
                 'f.refId',
-                DB::raw('COUNT(*)             AS folds'),
-                DB::raw('SUM(f.sumYard)       AS yards'),
-                DB::raw('MAX(f.createDate)    AS key_date'),
-                DB::raw('MAX(f.emp)           AS emp'),
-                DB::raw('MAX(f.customer)      AS customer'),
-                DB::raw('MAX(f.fabricId)      AS fabricId'),
-                DB::raw('MAX(f.fabricStruct)  AS fabricStruct'),
+                DB::raw('COUNT(*) AS folds'),
+                DB::raw('SUM(f.sumYard+0) AS yards'),
+                DB::raw('MAX(f.createDate) AS key_date'),
+                DB::raw('MAX(f.emp) AS emp'),
+                DB::raw('MAX(f.customer) AS customer'),
+                DB::raw('MAX(f.fabricId) AS fabricId'),
+                DB::raw('MAX(f.fabricStruct) AS fabricStruct'),
                 DB::raw('MAX(f.fabricPattern) AS fabricPattern'),
-                DB::raw('MAX(f.fabricW)       AS fabricW'),
+                DB::raw('MAX(f.fabricW) AS fabricW'),
                 DB::raw('MAX(f.supplier_name) AS supplier_name'),
-                DB::raw('MAX(f.invoice_no)    AS invoice_no'),
-                DB::raw('MAX(f.unit_price)    AS unit_price'),
-                DB::raw('MAX(f.SONumber)      AS SONumber'),
+                DB::raw('MAX(f.invoice_no) AS invoice_no'),
+                DB::raw('MAX(f.unit_price+0) AS unit_price'),
+                DB::raw('MAX(f.SONumber) AS SONumber'),
             ])
             ->whereIn('f.refId', $refIds)
             ->groupBy('f.refId')
@@ -278,10 +214,11 @@ class FabricimportController extends Controller
         return view('fabricimport.check.index', ['rows' => $paginator]);
     }
 
+    // ---------- checkShow ----------
     public function checkShow($refId)
     {
         $items = Fabricimport::where('refId', $refId)
-            ->orderByRaw('CAST(fold AS UNSIGNED) ASC')
+            ->orderByRaw('fold+0 ASC')   // ✅ เร็วกว่า CAST
             ->get();
 
         if ($items->isEmpty()) {
@@ -289,8 +226,11 @@ class FabricimportController extends Controller
         }
 
         $first = $items->first();
-        $totalYards = $items->sum('sumYard');
-        $unitPrice  = $first->unit_price;
+        $totalYards = DB::table('fabricimport')
+            ->where('refId', $refId)
+            ->sum(DB::raw('sumYard+0'));
+
+        $unitPrice = $first->unit_price;
 
         $header = (object)[
             'refId'         => $refId,
