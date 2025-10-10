@@ -3,10 +3,11 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+
 use App\Models\FabricImport;
-use App\Models\Customer;
-use App\Models\AstPurchaseorder; // สำหรับ datalist เดิม
-use App\Models\FabricAst;        // เอา fabric_w ประกอบ (ถ้าใช้)
+use App\Models\customer;
+use App\Models\astpurchaseorder; // สำหรับ datalist เดิม
+use App\Models\fabricast;        // เอา fabric_w ประกอบ (ถ้าใช้)
 
 class FabricImportController extends Controller
 {
