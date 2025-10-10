@@ -165,12 +165,12 @@
                                             <td>
   <form action="{{ route('fabricout.store') }}" method="post" target="_blank">
     @csrf
-    <input type="hidden" name="ref_id" value="{{ $findFabric->refId }}">
+    <input type="text" name="ref_id" value="{{ $findFabric->refId }}">
     <button type="submit" class="btn b_order" name="submit" value="submitfabricout">
       สั่งใบส่ง
     </button>
   </form>
-  
+
                                                 <form action="{{ route('fabricout.store') }}" method="post"
                                                     target="_blank">
                                                     @csrf
