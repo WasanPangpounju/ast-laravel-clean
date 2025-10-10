@@ -308,6 +308,12 @@
                                     </a>
                                 </li>
                                                                 <li class="nav-item">
+                                    <a href="{{ route('fabricimport.check.index') }}" class="nav-link"><i
+                                            class="far fa-circle nav-icon"></i>
+                                        <p>ตรวจสอบคีย์ผ้าซื้อเข้าสต็อก</p>
+                                    </a>
+                                </li>
+                                                                <li class="nav-item">
                                     <a href="{{ route('inventory.index') }}" class="nav-link"><i
                                             class="far fa-circle nav-icon"></i>
                                         <p>ออร์เดอร์ลูกค้า</p>
