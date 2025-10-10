@@ -254,19 +254,15 @@
                                             <td>{{ $sumfabricout[$i]->sumYardSum }}</td>
 
                                                                                         <td>
-                                                                                              <form action="{{ route('fabricout.store') }}" method="post" target="_blank">
-    @csrf
-    <input type="text" name="ref_id" value="{{ $findFabric->refId }}">
-    <button type="submit" class="btn b_order" name="submit" value="submitfabricout">
-      สั่งใบส่ง
-    </button>
-  </form>
-
+                                                                                            
                                                 <form action="{{ route('fabricout.store') }}" method="post"
                                                     target="_blank">
                                                     @csrf
                                                     <input type="hidden" name="fabricout_no"
                                                         value="{{ $sumfabricout[$i]->no }}">
+                                                    <input type="hidden" name="ref_id"
+                                                        value="{{ $sumfabricout[$i]->refId  }}">
+
 
                                                     <button type="submit" class="btn b_order" name="submit"
                                                         style="width: 5rem;margin: 0.2rem;font-size: 0.8rem"
