@@ -341,8 +341,8 @@ class FabricimportController extends Controller
             'key_date'      => $first->createDate ?? $first->created_at,
         ];
 
-        // return view('fabricimport.check.show', compact('header', 'items', 'refId'));
-print($refId);
+        return view('fabricimport.check.show', compact('header', 'items', 'refId'));
+// print($refId);
     }
 
     public function checkDestroyItem(Request $request, $refId, $id)
