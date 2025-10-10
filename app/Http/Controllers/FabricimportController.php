@@ -296,69 +296,16 @@ class FabricimportController extends Controller
 
     public function checkShow(Request $request, $refId)
 {
-    // 1) เปิดโหมด JSON เพื่อตัด view/layout ออกจากสมการ (ทดสอบด้วย ?_json=1)
-    $asJson = (string) $request->query('_json', '0') === '1';
+    $plain = $request->query('_plain') === '1';
 
-    // 2) ดึง “header” เฉพาะแถวแรก (เลือกเฉพาะคอลัมน์ที่ต้องใช้)
-    $first = \App\Models\Fabricimport::where('refId', $refId)
-        ->select(
-            'refId','emp','customer','fabricId','fabricStruct','fabricPattern','fabricW',
-            'supplier_name','invoice_no','unit_price','dye_lot','location','SONumber','createDate'
-        )
-        ->orderBy('id')
-        ->first();
+    // ... (ดึง $first, $items, สร้าง $header เหมือนเดิม)
 
-    if (!$first) {
-        abort(404, 'ไม่พบข้อมูลชุดนี้');
+    if ($plain) {
+        // วิวเบา ไม่ @extends อะไรเลย
+        return view('fabricimport.check.show-plain', compact('header','items','refId'));
     }
 
-    // 3) ดึงรายการพับ (จำกัด 200 แถวเพื่อกันพลาด; คุณมีแค่ 6 แถว)
-    $items = \App\Models\Fabricimport::where('refId', $refId)
-        ->select('id','fold','sumYard','createDate','emp')
-        ->orderByRaw('CAST(fold AS UNSIGNED) ASC')
-        ->limit(200)
-        ->get();
-
-    // 4) รวมแบบเบามากใน PHP (sumYard เป็น varchar → แปลงก่อน)
-    $totalFolds = $items->count();
-    $totalYards = 0.0;
-    foreach ($items as $r) {
-        $totalYards += (float) str_replace([',',' '], '', (string) $r->sumYard);
-    }
-
-    $header = (object)[
-        'refId'         => $refId,
-        'emp'           => $first->emp,
-        'customer'      => $first->customer,
-        'fabricId'      => $first->fabricId,
-        'fabricStruct'  => $first->fabricStruct,
-        'fabricPattern' => $first->fabricPattern,
-        'fabricW'       => $first->fabricW,
-        'supplier_name' => $first->supplier_name,
-        'invoice_no'    => $first->invoice_no,
-        'unit_price'    => $first->unit_price,
-        'dye_lot'       => $first->dye_lot,
-        'location'      => $first->location,
-        'SONumber'      => $first->SONumber,
-        'folds'         => $totalFolds,
-        'yards'         => $totalYards,
-        'total_cost'    => $first->unit_price ? ($totalYards * (float)$first->unit_price) : null,
-        'key_date'      => $first->createDate,
-    ];
-
-    // 5) ถ้าเป็นโหมด JSON → ตัด Blade ออกไปเลย เพื่อตรวจว่าคอขวดอยู่ที่ view หรือไม่
-    if ($asJson) {
-        return response()->json([
-            'ok' => true,
-            'refId' => $refId,
-            'header' => $header,
-            'items' => $items,
-        ]);
-    }
-
-    // 6) โหมดปกติ → ส่งเข้า view ตามเดิม
-    // return view('fabricimport.check.show', compact('header', 'items', 'refId'));
-    print($refId);
+    return view('fabricimport.check.show', compact('header','items','refId'));
 }
 
     public function checkShow_backup($refId)
