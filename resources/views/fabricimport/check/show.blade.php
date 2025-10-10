@@ -4,7 +4,6 @@
 @section('content')
 <div class="content-wrapper always-show-actions">
 
-  {{-- ทำให้ปุ่ม/ฟอร์ม action มองเห็นตลอด --}}
   <style>
     .always-show-actions .header-actions .btn,
     .always-show-actions .action-cell .btn,
@@ -51,8 +50,11 @@
           <button type="submit" class="btn btn-danger btn-sm">ลบรายการนี้ทั้งหมด</button>
         </form>
 
-        {{-- กลับ --}}
+        {{-- ปุ่มกลับ --}}
         <a href="{{ route('fabricimport.check.index') }}" class="btn b_order">กลับ</a>
+
+        {{-- (ตัวช่วย debug) เปิดหน้าแบบเบา ไม่ผ่าน layout --}}
+        <a href="{{ request()->url() }}?_plain=1" class="btn btn-secondary btn-sm">โหมดเบา (ทดสอบ)</a>
       </div>
     </div>
   </div>
@@ -79,7 +81,7 @@
               <p class="mb-1">
                 <strong>วันที่คีย์:</strong>
                 @if(!empty($header->key_date))
-                  {{ \Carbon\Carbon::parse($header->key_date)->format('d/m/Y') }}
+                  {{ @date('d/m/Y', @strtotime($header->key_date)) }}
                 @endif
               </p>
               <p class="mb-1"><strong>ผู้คีย์:</strong> {{ $header->emp }}</p>
@@ -108,13 +110,13 @@
               <p class="mb-1"><strong>SO Number:</strong> {{ $header->SONumber }}</p>
               <p class="mb-1">
                 <strong>ราคาซื้อต่อหลา:</strong>
-                @if(!is_null($header->unit_price)) {{ number_format($header->unit_price, 2) }} @endif
+                @if(!is_null($header->unit_price)) {{ number_format((float)$header->unit_price, 2) }} @endif
               </p>
-              <p class="mb-1"><strong>รวมพับ:</strong> {{ number_format($header->folds) }}</p>
-              <p class="mb-1"><strong>รวมหลา:</strong> {{ number_format($header->yards, 2) }}</p>
+              <p class="mb-1"><strong>รวมพับ:</strong> {{ (int)$header->folds }}</p>
+              <p class="mb-1"><strong>รวมหลา:</strong> {{ number_format((float)$header->yards, 2) }}</p>
               <p class="mb-1">
                 <strong>ราคารวม:</strong>
-                @if(!is_null($header->total_cost)) {{ number_format($header->total_cost, 2) }} @endif
+                @if(!is_null($header->total_cost)) {{ number_format((float)$header->total_cost, 2) }} @endif
               </p>
             </div>
           </div>
@@ -136,19 +138,23 @@
                 </tr>
               </thead>
               <tbody>
-                @foreach ($items as $it)
+                @forelse ($items as $it)
                   <tr>
-                    <td class="text-right">{{ number_format($it->fold) }}</td>
-                    <td class="text-nowrap text-center">
-                      {{ \Carbon\Carbon::parse($it->createDate ?? $it->created_at)->format('d/m/Y') }}
+                    <td class="text-right">
+                      {{ (int)preg_replace('/\D+/', '', (string)$it->fold) }}
                     </td>
-                    <td class="text-right">{{ number_format($it->sumYard, 2) }}</td>
+                    <td class="text-nowrap text-center">
+                      {{ @date('d/m/Y', @strtotime($it->createDate ?? $it->created_at)) }}
+                    </td>
+                    <td class="text-right">
+                      {{ number_format((float)str_replace(',', '', (string)$it->sumYard), 2) }}
+                    </td>
                     <td>{{ $it->emp }}</td>
                     <td class="text-center action-cell">
                       <div class="row-actions">
                         <form method="POST"
-                              action="{{ route('fabricimport.check.item.destroy', ['refId' => $refId, 'id' => $it->id]) }}"
-                              onsubmit="return confirm('ยืนยันลบพับที่ {{ $it->fold }} หรือไม่?');">
+                              action="{{ route('fabricimport.check.destroyItem', ['refId' => $refId, 'id' => $it->id]) }}"
+                              onsubmit="return confirm('ยืนยันลบพับที่ {{ (int)preg_replace('/\D+/', '', (string)$it->fold) }} หรือไม่?');">
                           @csrf
                           @method('DELETE')
                           <button type="submit" class="btn btn-danger btn-sm">ลบ</button>
@@ -156,10 +162,9 @@
                       </div>
                     </td>
                   </tr>
-                @endforeach
-                @if ($items->isEmpty())
+                @empty
                   <tr><td colspan="5" class="text-center text-muted p-4">ไม่พบรายการ</td></tr>
-                @endif
+                @endforelse
               </tbody>
             </table>
           </div>
