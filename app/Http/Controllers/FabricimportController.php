@@ -1,90 +1,24 @@
-<?php
-
+// app/Http/Controllers/FabricImportController.php
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
-use App\Models\AstPurchaseorder;
-use App\Models\FabricAst;
-use App\Models\FabricAststructure;
-use App\Models\Inventory;
-use App\Models\orderdeadline;
-use App\Models\stockfabric;
-use App\Models\fabricout;
-use App\Models\customer;
+use Illuminate\Support\Facades\DB;
+use App\Models\FabricImport;
+use App\Models\Customer;
+use App\Models\AstPurchaseorder; // สำหรับ datalist เดิม
+use App\Models\FabricAst;        // เอา fabric_w ประกอบ (ถ้าใช้)
 
-
-use PhpParser\Node\Expr\Print_;
-
-use PDF;
-use Dompdf\Dompdf;
-use Codedge\Fpdf\Fpdf\Fpdf;
-
-use Carbon\Carbon;
-
-class FabricimportController extends Controller
+class FabricImportController extends Controller
 {
-
     public function __construct()
     {
         $this->middleware('auth');
     }
 
-
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index()
-    {
-        //
-        //get all order status is except to manufacture.
-        $ecp = AstPurchaseorder::select('id')->where('status', 'อนุมัติให้ผลิต')->get();
-
-        $orders = AstPurchaseorder::select('id', 'purchaseOrder' , 'customerName', 'createDate', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder', 'fabricPattern')
-            ->whereIn('id', $ecp)
-            // ->orderBy('created_at', 'desc')
-            ->orderBy('createDate', 'desc')
-            ->get();
-
-        $inventorydata = Inventory::select('refId', Inventory::raw('SUM(fold) as foldSum'), Inventory::raw('SUM(sumYard) as sumYardSum'))
-            ->groupBy('refId')
-            ->get();
-        // print_r($inventorydata);
-        $fabricoutdata = fabricout::select('orderId', fabricout::raw('COUNT(fold) as foldCount'), fabricout::raw('SUM(sumYard) as sumYardSum'))
-            ->whereNotNull('orderId')
-            ->groupBy('orderId')
-            ->get();
-
-        $fabricoutdata2 = FabricAst::select('purchaseOrder', 'fabric_w')
-            ->whereIn('purchaseOrder', $ecp)
-            // ->groupBy('purchaseOrder','fabric_w')
-            ->get();
-
-        // Combine the data using purchaseOrder as the key
-        $combinedData = $orders->map(function ($order) use ($fabricoutdata2) {
-            $fabricData = $fabricoutdata2->where('purchaseOrder', $order->purchaseOrder)->first();
-            $order->fabric_w = $fabricData ? $fabricData->fabric_w : null;
-            return $order;
-        });
-
-        // print_r($orders->fabricId);
-
-        return view('fabricimport.index', compact('orders', 'inventorydata', 'fabricoutdata', 'fabricoutdata2'));
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
+    // หน้าเลือกข้อมูล + ช่องคีย์ 160 ช่อง
     public function create()
     {
-        //
-        //get all order status is except to manufacture.
-        $ecp = FabricAststructure::select('purchaseOrder AS id')->get();
-
+        // ดึง orders + fabric_w แบบเดียวกับ inventory.create เพื่อใช้ datalist
         $orders = AstPurchaseorder::select(
             'ast_purchaseorders.id',
             'ast_purchaseorders.customerName',
@@ -96,802 +30,175 @@ class FabricimportController extends Controller
             'ast_purchaseorders.fabricPattern',
             'fabric_asts.fabric_w'
         )
-            ->join('fabric_asts', 'fabric_asts.purchaseOrder', '=', 'ast_purchaseorders.id')
-            ->whereIn('ast_purchaseorders.id', $ecp)
-            ->orderBy('ast_purchaseorders.customerName')
-            ->get();
-
-
-        // print_r($records);
-        // print_r('/////////');
-        // print_r($orders);
+        ->join('fabric_asts', 'fabric_asts.purchaseOrder', '=', 'ast_purchaseorders.id')
+        ->orderBy('ast_purchaseorders.customerName')
+        ->get();
 
         $customers = Customer::orderBy('name')->get();
-        // print_r($customers);
 
-        return view('fabricimport.create', compact('orders', 'customers'));
+        return view('fabricimport.create', compact('orders','customers'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
+    // เก็บรอบ/ปิดรอบ
     public function store(Request $request)
     {
-        //
-        //searchImport
+        $action = $request->input('submit'); // nextData | endData
 
-        if ($request->filled('submit') && $request->submit == 'searchImport') {
+        // validate header/spec
+        $request->validate([
+            'dt'             => ['required','string'], // dd/mm/yyyy
+            'fabricId'       => ['required','string'],
+            'fabricStruct'   => ['required','string'],
+            'fabricPattern'  => ['nullable','string'],
+            'fabricW'        => ['required','string'],
+            'customer'       => ['nullable','string'],
 
-    // --- normalize fabricStruct: * == x, ลบช่องว่าง, to lower ---
-    $normFs = function (?string $s) {
-        $s = (string) $s;
-        $s = str_replace('undefined', '', $s);
-        // ให้ * และ x เป็นตัวคั่นเดียวกัน และตัดช่องว่างรอบตัวคั่นออก
-        $s = preg_replace('/\s*([*x])\s*/i', 'x', $s);
-        // ลบช่องว่างที่เหลือทั้งหมด
-        $s = preg_replace('/\s+/', '', $s);
-        return strtolower(trim($s));
-    };
-    // ฝั่งคอลัมน์ใน DB (ast_purchaseorders)
-    $fsExpr = "REPLACE(REPLACE(LOWER(fabricStructure),' ',''),'*','x')";
+            'supplier_name'  => ['required','string'],
+            'invoice_no'     => ['required','string'],
+            'unit_price'     => ['nullable','numeric'],
+            'dye_lot'        => ['nullable','string'],
+            'location'       => ['nullable','string'],
+            'SONumber'       => ['nullable','string'],
+        ]);
 
-    // --- รับ input ---
-    $customerName  = $request->input('customerName');
-    $fabricStruct  = $request->input('fabricStruct');
-    $fabricPattern = $request->input('fabricPattern');
-    $fabricW       = $request->input('fabricW');   // ตาราง FabricAst
-    $fabricId      = $request->input('fabricId');
-    $orderId       = $request->input('orderId');
-    $imDate        = $request->input('imDate');    // d/m/Y
+        // parse date
+        $dt = \DateTime::createFromFormat('d/m/Y', str_replace('-', '/', $request->dt));
+        $dateYmd = $dt ? $dt->format('Y-m-d') : now()->toDateString();
 
-    // ออเดอร์ที่อนุมัติให้ผลิต
-    $ecp = AstPurchaseorder::where('status', 'อนุมัติให้ผลิต')->pluck('id');
+        // เก็บลง session เพื่อใช้ต่อเนื่องตอนกด nextData
+        session()->put([
+            'dt'            => $dateYmd,
+            'fabricId'      => $request->fabricId,
+            'fabricStruct'  => $request->fabricStruct,
+            'fabricPattern' => $request->fabricPattern,
+            'fabricW'       => $request->fabricW,
+            'customer'      => $request->customer,
+            'supplier_name' => $request->supplier_name,
+            'invoice_no'    => $request->invoice_no,
+            'unit_price'    => $request->unit_price,
+            'dye_lot'       => $request->dye_lot,
+            'location'      => $request->location,
+            'SONumber'      => $request->SONumber,
+        ]);
 
-    // ====== สร้างคิวรีแบบ "แม่นก่อน" ======
-    $q = AstPurchaseorder::select(
-            'id','customerName','createDate','fabricId',
-            'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
-        )->whereIn('id', $ecp);
-
-    // customerName: เริ่มจาก like prefix ให้แคบก่อน
-    if (filled($customerName)) {
-        $q->where('customerName', 'LIKE', $customerName.'%');
-    }
-
-    // fabricStruct: เริ่มจาก == หลัง normalize (แม่น)
-    if (filled($fabricStruct)) {
-        $q->whereRaw("$fsExpr = ?", [$normFs($fabricStruct)]);
-    }
-
-    // fabricPattern: ถ้าต้องตรง ให้ใช้ '=' (ถ้าอยากยืดหยุ่นค่อย fallback)
-    if (filled($fabricPattern)) {
-        $q->where('fabricPattern', $fabricPattern);
-    }
-
-    // fabricW: อยู่ใน FabricAst — เริ่มจาก '=' ให้แม่นก่อน
-    if (filled($fabricW)) {
-        $q->whereExists(function ($sub) use ($fabricW) {
-            $sub->select(DB::raw(1))
-                ->from('fabric_asts') // แก้ให้ตรงชื่อตารางจริงของ FabricAst
-                ->whereColumn('fabric_asts.purchaseOrder', 'ast_purchaseorders.purchaseOrder')
-                ->where('fabric_asts.fabric_w', $fabricW);
-        });
-    }
-
-    if (filled($fabricId)) {
-        $q->where('fabricId', $fabricId);
-    }
-
-    if (filled($orderId)) {
-        $q->where('id', $orderId);
-    }
-
-    if (filled($imDate)) {
-        $dt = \DateTime::createFromFormat('d/m/Y', $imDate);
-        if ($dt) {
-            $q->whereDate('createDate', $dt->format('Y-m-d'));
+        // เตรียม refId (เหมือนเดิม: สุ่ม base64 ตัด '/')
+        if (!session()->has('refId')) {
+            $bytes  = random_bytes(32);
+            $base64 = base64_encode($bytes);
+            $key    = str_replace('/', '', $base64);
+            session()->put('refId', $key);
         }
-    }
+        $refId = session('refId');
 
-    // ยิงรอบแรก (แม่น)
-    $importorder = $q->orderBy('createDate','desc')->get();
+        // อ่านค่าช่องคีย์
+        $arr = $request->input('sumYard', []); // [foldNo => yards]
+        $toInsert = [];
+        $countNew = 0;
+        $sumNew   = 0;
 
-    // ====== Fallback: ถ้าไม่เจอเลย ค่อย "ยืดหยุ่น" บางเงื่อนไข ======
-    if ($importorder->isEmpty()) {
-        $q2 = AstPurchaseorder::select(
-                'id','customerName','createDate','fabricId',
-                'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
-            )->whereIn('id', $ecp);
+        foreach ($arr as $foldNo => $yards) {
+            if ($yards === '' || $yards === null) continue;
+            if (!is_numeric($yards)) continue;
+            $countNew++;
+            $sumNew += (float)$yards;
 
-        if (filled($customerName)) {
-            // ขยายเป็น contains
-            $q2->where('customerName', 'LIKE', '%'.$customerName.'%');
+            $toInsert[] = [
+                'refId'         => $refId,
+                'emp'           => auth()->user()->name,
+                'fabricStruct'  => session('fabricStruct'),
+                'fabricW'       => session('fabricW'),
+                'fold'          => (int)$foldNo,
+                'sumYard'       => (float)$yards,
+                'createDate'    => session('dt'),
+                'fabricPattern' => session('fabricPattern'),
+                'customer'      => session('customer'),
+                'fabricId'      => session('fabricId'),
+                'supplier_name' => session('supplier_name'),
+                'invoice_no'    => session('invoice_no'),
+                'unit_price'    => session('unit_price'),
+                'dye_lot'       => session('dye_lot'),
+                'location'      => session('location'),
+                'SONumber'      => session('SONumber'),
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ];
         }
 
-        if (filled($fabricStruct)) {
-            // ขยายจาก == เป็น LIKE ใกล้เคียง (normalized ทั้งสองฝั่ง)
-            $needle = $normFs($fabricStruct);
-            $q2->whereRaw("$fsExpr LIKE ?", ['%'.$needle.'%']);
+        // อัปเดตตัวนับบน session (แสดงผลในหน้า)
+        $oldEnd = (int) session('endCount', 0);
+        $oldSum = (float) session('sum', 0);
+        session()->put('endCount', $oldEnd + $countNew);
+        session()->put('sum',     $oldSum + $sumNew);
+
+        // บันทึก batch
+        if (!empty($toInsert)) {
+            DB::table('fabricimports')->insert($toInsert);
         }
 
-        if (filled($fabricPattern)) {
-            // ขยายเป็น LIKE แทน =
-            $q2->where('fabricPattern', 'LIKE', '%'.$fabricPattern.'%');
+        if ($action === 'nextData') {
+            return redirect()->route('fabricimport.create')->with('ok', 'บันทึกรายการเพิ่มแล้ว (ยังไม่ปิดเอกสาร)');
         }
 
-        if (filled($fabricW)) {
-            // ขยายเป็น LIKE แทน =
-            $q2->whereExists(function ($sub) use ($fabricW) {
-                $sub->select(DB::raw(1))
-                    ->from('fabric_asts')
-                    ->whereColumn('fabric_asts.purchaseOrder', 'ast_purchaseorders.purchaseOrder')
-                    ->where('fabric_asts.fabric_w', 'LIKE', '%'.$fabricW.'%');
-            });
-        }
-
-        if (filled($fabricId)) {
-            $q2->where('fabricId', 'LIKE', '%'.$fabricId.'%');
-        }
-
-        if (filled($orderId)) {
-            $q2->where('id', 'LIKE', '%'.$orderId.'%');
-        }
-
-        if (filled($imDate)) {
-            $dt = \DateTime::createFromFormat('d/m/Y', $imDate);
-            if ($dt) {
-                $q2->whereDate('createDate', $dt->format('Y-m-d'));
-            }
-        }
-
-        $importorder = $q2->orderBy('createDate','desc')->get();
-    }
-
-    // ====== คงตัวแปรประกอบที่ view ใช้อยู่เดิม ======
-    $orders = AstPurchaseorder::select(
-            'id','customerName','createDate','fabricId',
-            'fabricStructure','orderSumYard','purchaseOrder','fabricPattern'
-        )
-        ->whereIn('id', $ecp)
-        ->orderBy('createDate','desc')
-        ->get();
-
-    $inventorydata = Inventory::select(
-            'refId',
-            Inventory::raw('SUM(fold) as foldSum'),
-            Inventory::raw('SUM(sumYard) as sumYardSum')
-        )
-        ->groupBy('refId')
-        ->get();
-
-    $fabricoutdata = fabricout::select(
-            'orderId',
-            fabricout::raw('COUNT(fold) as foldCount'),
-            fabricout::raw('SUM(sumYard) as sumYardSum')
-        )
-        ->whereNotNull('orderId')
-        ->groupBy('orderId')
-        ->get();
-
-    $f2 = FabricAst::select('purchaseOrder','fabric_w');
-    if (filled($fabricW)) {
-        $f2->where('fabric_w','LIKE','%'.$fabricW.'%');
-    }
-    $fabricoutdata2 = $f2->get();
-
-    $select_search = '';
-    $searchInput   = '';
-
-    return view('inventory.index', compact(
-        'importorder','select_search','inventorydata','fabricoutdata','fabricoutdata2','orders'
-    ));
-}
-
-        //check next data then save and set end count to session  and show create with end count
-        if ($request->filled('submit') && $request->submit == 'nextData') {
-            $oldEnd = session()->get('endCount');
-            //remove session
-            session()->forget('endCount');
-            session()->forget('dt');
-            session()->forget('fabricId');
-            session()->forget('fabricStruct');
-            session()->forget('fabricPattern');
-            session()->forget('fabricW');
-            session()->forget('customer');
-
-            //check data is null 
-            // $foldData = $request->input('fold');
-            // print($foldData[1]);
-
-            $fabricData = $request->input('sumYard');
-
-            $arr_data = array();
-
-            // foreach ($fabricData as $data) {
-            //     // print($data);
-
-            //     if ($data  != '') {
-
-            //         array_push($arr_data, $data);
-            //     }
-            // }
-            $sum = 0;
-
-            foreach ($fabricData as $data) {
-                // print($data);
-
-                if ($data  != '') {
-                    $sum = $sum + $data;
-
-                    array_push($arr_data, $data);
-                }
-            }
-
-            //set sumyard  to session
-            if (!session()->has('sum')) {
-                session()->put('sum', $sum);
-            } else {
-                $sum = $sum + session()->get('sum');
-
-                session()->forget('sum');
-                session()->put('sum', $sum);
-            }
-
-            //set session from input 
-            // $endCount = $request->input('endCount') ? $request->input('endCount') : 0;
-            $endCount =  $oldEnd + count($arr_data);
-            // print($endCount );
-            if ($oldEnd == null) {
-                $oldEnd  = 1;
-            } else {
-                $oldEnd = $oldEnd + 1;
-            }
-            session()->put('endCount',  $endCount);
-            // $date = $request->input('dt') ? $request->input('dt') : date('Y-m-d');
-
-            $fixedDate = str_replace('/', '-', $request->input('dt') ? $request->input('dt') : date('Y-m-d'));
-            // $validatedData['createDate'] = date('Y-m-d', strtotime($fixedDate));
-            // $createDate = $request->input('createDate');
-            $date = date('Y-m-d', strtotime($fixedDate));
-
-            session()->put('dt', $date);
-
-            session()->put('fabricStruct',  $request->input('fabricStruct'));
-            session()->put('fabricPattern',  $request->input('fabricPattern'));
-            session()->put('fabricW', $request->input('fabricW'));
-            session()->put('customer', $request->input('customer'));
-            session()->put('fabricId', $request->input('fabricId'));
-
-
-            //check input fabric 
-            if (count($arr_data) > 0) {
-                //check key of fabric lot input
-                if (session()->has('refId')) {
-                    //get key from session to variable key
-                    $key = session()->get('refId');
-
-                    //save data
-                    $this->saveFabricData(
-                        $arr_data,
-                        $key,
-                        auth()->user()->name,
-                        session()->get('fabricId'),
-                        session()->get('fabricStruct'),
-                        session()->get('fabricPattern'),
-                        session()->get('fabricW'),
-                        $oldEnd,
-                        $date,
-                        session()->get('customer'),
-                    );
-                } else {
-                    //generate key and set to session
-                    // $key = base64_encode(random_bytes(32)); // generates a 32-byte (256-bit) key
-                    // $key = urlencode($key);
-                    $bytes = random_bytes(32);
-                    $base64 = base64_encode($bytes);
-                    $key = str_replace('/', '', $base64);
-                    // echo $key;
-                    session()->put(['refId' => $key]);
-
-                    //save data
-                    $this->saveFabricData(
-                        $arr_data,
-                        $key,
-                        auth()->user()->name,
-                        session()->get('fabricId'),
-                        session()->get('fabricStruct'),
-                        session()->get('fabricPattern'),
-                        session()->get('fabricW'),
-                        $oldEnd,
-                        $date,
-                        session()->get('customer'),
-                    );
-                }
-            }
-            // print_r($arr_data .'////'.
-            // $key .'////'.
-            // auth()->user()->name.'////'.
-            // session()->get('fabricStruct').'////'.
-            // session()->get('fabricPattern')
-            // .'////'.
-            // session()->get('fabricW')
-            // .'////'.
-            // session()->get('customer').'////'.
-            // $oldEnd.'////'.
-            // $date);
-            print_r(session()->get('customer'));
-            return $this->create();
-        }
-
-        //save last record
-        if ($request->filled('submit') && $request->submit == 'endData') {
-            $oldEnd = session()->get('endCount');
-            //remove session
-            session()->forget('endCount');
-            session()->forget('dt');
-            session()->forget('fabricStruct');
-            session()->forget('fabricPattern');
-            session()->forget('fabricW');
-            session()->forget('customer');
-            session()->forget('fabricId');
-
-            //check data is null 
-            // $foldData = $request->input('fold');
-            // print($foldData[1]);
-
-            $fabricData = $request->input('sumYard');
-
-            $arr_data = array();
-
-            foreach ($fabricData as $data) {
-                // print($data);
-
-                if ($data  != '') {
-
-                    array_push($arr_data, $data);
-                }
-            }
-
-            //set session from input 
-            // $endCount = $request->input('endCount') ? $request->input('endCount') : 0;
-            $endCount =  $oldEnd + count($arr_data);
-            // print($endCount );
-            if ($oldEnd == null) {
-                $oldEnd  = 0;
-            }
-
-            if ($oldEnd >= 0) {
-                $oldEnd = $oldEnd + 1;
-            }
-
-            session()->put('endCount',  $endCount);
-            // $date = $request->input('dt') ? $request->input('dt') : date('Y-m-d');
-
-            $fixedDate = str_replace('/', '-', $request->input('dt') ? $request->input('dt') : date('Y-m-d'));
-            // $validatedData['createDate'] = date('Y-m-d', strtotime($fixedDate));
-            // $createDate = $request->input('createDate');
-            $date = date('Y-m-d', strtotime($fixedDate));
-
-            session()->put('dt', $date);
-            session()->put('fabricStruct',  $request->input('fabricStruct'));
-            session()->put('fabricPattern',  $request->input('fabricPattern'));
-            session()->put('fabricW', $request->input('fabricW'));
-            session()->put('customer', $request->input('customer'));
-            session()->put('fabricId', $request->input('fabricId'));
-
-
-            //check input fabric 
-            if (count($arr_data) > 0) {
-                //check key of fabric lot input
-                if (session()->has('refId')) {
-                    //get key from session to variable key
-                    $key = session()->get('refId');
-
-                    //save data
-                    $this->saveFabricData(
-                        $arr_data,
-                        $key,
-                        auth()->user()->name,
-                        session()->get('fabricId'),
-                        session()->get('fabricStruct'),
-                        session()->get('fabricPattern'),
-                        session()->get('fabricW'),
-                        $oldEnd,
-                        $date,
-                        session()->get('customer'),
-                    );
-                } else {
-                    //generate key and set to session
-                    // $key = base64_encode(random_bytes(32)); // generates a 32-byte (256-bit) key
-                    // $key = urlencode($key);
-                    $bytes = random_bytes(32);
-                    $base64 = base64_encode($bytes);
-                    $key = str_replace('/', '', $base64);
-                    // echo $key;
-                    session()->put(['refId' => $key]);
-
-                    //save data
-                    $this->saveFabricData(
-                        $arr_data,
-                        $key,
-                        auth()->user()->name,
-                        session()->get('fabricId'),
-                        session()->get('fabricStruct'),
-                        session()->get('fabricPattern'),
-                        session()->get('fabricW'),
-                        $oldEnd,
-                        $date,
-                        session()->get('customer'),
-                    );
-                }
-            }
-
-
-            //remove session
-            session()->forget('refId');
-            session()->forget('endCount');
-            session()->forget('dt');
-            session()->forget('fabricId');
-            session()->forget('fabricStruct');
-            session()->forget('fabricPattern');
-            session()->forget('fabricW');
-            session()->forget('customer');
-            session()->forget('sum');
-
-
-            // return $this->create();
-            return redirect('/stockfabric');
-        }
-
-        if ($request->filled('submit') && $request->submit == 'checkdata') {
-            //print($request->submit);
-            if (!$request->filled('createDate')) {
-                $request->request->add(['createDate' => date("m/d/Y")]);
-            }
-            if (!$request->filled('lot')) {
-                $request->request->add(['lot' => date("Y") . '1']);
-            }
-            if (!$request->filled('pallet')) {
-                $request->request->add(['pallet' => '0']);
-            }
-            if (!$request->filled('box')) {
-                $request->request->add(['box' => '0']);
-            }
-            if (!$request->filled('sack')) {
-                $request->request->add(['sack' => '0']);
-            }
-            if (!$request->filled('orderId')) {
-                $request->request->add(['importStatus' => 'no import number']);
-            }
-            $refId = $request->refId;
-            $orderdata = AstPurchaseorder::find($refId);
-            // print_r($orderdata);
-            $structuredata = FabricAststructure::where('purchaseOrder', $refId)->get();
-            $orderdeadline = orderdeadline::where('purchaseOrder', $refId)->get();
-            $fabricdata = FabricAst::where('purchaseOrder', $refId)->get();
-
-            $imdata = $request;
-            //print($imdata->supplierName );
-            // print_r($refId);
-            // print_r("5555555555555555555555555555555");
-            return view('inventory.detail', compact('imdata', 'orderdata', 'structuredata', 'orderdeadline', 'fabricdata',));
-        }
-
-        if ($request->filled('submit') && $request->submit == 'savedata') {
-            $validatedData = $request->validate([
-                'refId' => 'required',
-                'emp' => 'required',
-                'inventoryName' => 'required',
-                'orderId' => 'required',
-                'createDate' => 'required',
-                'fabricId' => 'required',
-                'fabricStruct' => 'required',
-                'fold' => 'required',
-                'sumYard' => 'required',
-                'sumM' => 'required',
-                'fabricW' => 'required',
-                'comment' => 'nullable'
-            ]);
-            //             print_r("test123");
-            $show = Inventory::updateOrCreate($validatedData);
-            //insert to db success
-            if ($show) {
-                return $this->create();
-            }
-
-            // return view('inventory.create');
-        }
-        if ($request->filled('submit') && $request->submit == "genPDF") {
-
-            $now = Carbon::now(new \DateTimeZone('Asia/Bangkok'));
-            $day = $now->day;
-            $month = $now->month;
-            $year = $now->year;
-            //example create pdf with thai font
-            $this->fpdf = new Fpdf;
-            // Add Thai font 
-            $this->fpdf->AddFont('THSarabunNew', '', 'THSarabunNew.php');
-            $this->fpdf->AddFont('THSarabunNew', 'B', 'THSarabunNew_b.php');
-            $this->fpdf->AddPage();
-            $this->fpdf->SetFont('THSarabunNew', '', 16);
-            $this->fpdf->Cell(70, 10, '', 0, 0);
-            $this->fpdf->SetFont('THSarabunNew', 'B', 24);
-            $this->fpdf->Cell(60, 10, iconv('UTF-8', 'cp874', 'AST ใบส่งคืนสินค้า'), 0, 0);
-            $this->fpdf->Cell(20, 10, '', 0, 0);
-            $this->fpdf->Cell(80, 10, 'No.', 0, 0);
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->Cell(150, 5, '', 0, 0);
-            // $this->fpdf->Cell(40, 10, iconv('UTF-8', 'cp874', 'ว.ด.ป.' . $day . '/' . $month . '/' . $year), 0, 0);
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->SetFont('THSarabunNew', 'B', 18);
-            $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'ผู้สั่ง .....'), 0, 0);
-            $this->fpdf->Cell(60, 10, '', 0, 0);
-            $this->fpdf->Cell(80, 5, iconv('UTF-8', 'cp874', 'ผู้รับ   .....    '), 0, 0);
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->Cell(20, 10, '', 5, 1); //end of line
-            $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รหัสผ้า  .....    '), 0, 0);
-            $this->fpdf->Cell(60, 10, '', 0, 0);
-            $this->fpdf->Cell(80, 5, iconv('UTF-8', 'cp874', 'วันที่   .....    '), 0, 0);
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-
-
-            // $this->fpdf->SetFont('Arial', '', 12);
-            // $this->fpdf->Ln();
-            // $this->fpdf->Cell(60, 10, 'Header 1', 1);
-            // $this->fpdf->Cell(60, 10, 'Header 2', 1);
-            // $this->fpdf->Cell(60, 10, 'Header 3', 1);
-            // $this->fpdf->Ln();
-            // $this->fpdf->Cell(60, 10, 'Row 1, Column 1', 1);
-            // $this->fpdf->Cell(60, 10, 'Row 1, Column 2', 1);
-            // $this->fpdf->Cell(60, 10, 'Row 1, Column 3', 1);
-            // $this->fpdf->Ln();
-            // $this->fpdf->Cell(60, 10, 'Row 2, Column 1', 1);
-            // $this->fpdf->Cell(60, 10, 'Row 2, Column 2', 1);
-            // $this->fpdf->Cell(60, 10, 'Row 2, Column 3', 1);
-
-            // $this->fpdf->AddPage();
-            // $this->fpdf->SetFont('Arial', 'B', 16);
-            // $this->fpdf->Cell(40, 10, 'Table 2');
-
-            // $this->fpdf->SetFont('Arial', '', 12);
-            // $this->fpdf->Ln();
-            // $this->fpdf->Cell(60, 10, 'Header 1', 1);
-            // $this->fpdf->Cell(60, 10, 'Header 2', 1);
-            // $this->fpdf->Cell(60, 10, 'Header 3', 1);
-            // $this->fpdf->Ln();
-            // $this->fpdf->Cell(60, 10, 'Row 1, Column 1', 1);
-            // $this->fpdf->Cell(60, 10, 'Row 1, Column 2', 1);
-            // $this->fpdf->Cell(60, 10, 'Row 1, Column 3', 1);
-            // $this->fpdf->Ln();
-            // $this->fpdf->Cell(60, 10, 'Row 2, Column 1', 1);
-            // $this->fpdf->Cell(60, 10, 'Row 2, Column 2', 1);
-            // $this->fpdf->Cell(60, 10, 'Row 2, Column 3', 1);
-            $this->fpdf->Cell(20, 10, '', 5, 1); //end of line
-
-            $this->fpdf->SetFont('Arial', '', 12);
-            $a = 46;
-            // Generate the data for the first column
-            $column1 = array();
-            for ($i = 1; $i <= 20; $i++) {
-                $column1[] = "$i";
-            }
-
-            // Generate the data for the second column based on the first column
-            $column2 = array();
-            for ($i = 0; $i < count($column1); $i++) {
-                $column2[] = "new " . $column1[$i];
-            }
-
-            // Display the data in two columns
-            $col_width = $this->fpdf->GetPageWidth() / 8;
-            $x = $this->fpdf->GetX();
-            $y = $this->fpdf->GetY();
-
-            for ($i = 0; $i < count($column1); $i++) {
-                $this->fpdf->SetXY($x, $y);
-                $this->fpdf->Cell($col_width, 5, $column1[$i], 1);
-                $this->fpdf->SetXY($x + $col_width, $y);
-                $this->fpdf->Cell($col_width, 5, $column2[$i], 1);
-
-                if ($i + 20 < $a) {
-                    $this->fpdf->SetXY($x + $col_width * 2, $y);
-                    $this->fpdf->Cell($col_width, 5, $column1[$i] + 20, 1);
-                    $this->fpdf->SetXY($x + $col_width * 3, $y);
-                    $this->fpdf->Cell($col_width, 5, $column2[$i], 1);
-                } else {
-                }
-                // $this->fpdf->SetXY($x+ $col_width*2, $y);
-                // $this->fpdf->Cell($col_width, 5, $column1[$i] + 10, 1);
-                // $this->fpdf->SetXY($x + $col_width*3, $y);
-                // $this->fpdf->Cell($col_width, 5, $column2[$i], 1);
-                if ($i + 40 < $a) {
-                    $this->fpdf->SetXY($x + $col_width * 4, $y);
-                    $this->fpdf->Cell($col_width, 5, $column1[$i] + 40, 1);
-                    $this->fpdf->SetXY($x + $col_width * 5, $y);
-                    $this->fpdf->Cell($col_width, 5, $column2[$i], 1);
-                } else {
-                }
-                // $this->fpdf->SetXY($x+ $col_width*4, $y);
-                // $this->fpdf->Cell($col_width, 5, $column1[$i] +20, 1);
-                // $this->fpdf->SetXY($x + $col_width*5, $y);
-                // $this->fpdf->Cell($col_width, 5, $column2[$i], 1);
-
-                $y += 5;
-                if ($y > $this->fpdf->GetPageHeight() - 20) {
-                    $this->fpdf->AddPage();
-                    $y = 20;
-                }
-            }
-            $this->fpdf->Cell(20, 20, '', 5, 1); //end of line
-            $this->fpdf->SetFont('THSarabunNew', 'B', 18);
-            $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'รวม ..... พับ'), 0, 0);
-            $this->fpdf->Cell(30, 10, '', 0, 0);
-            $this->fpdf->Cell(80, 5, iconv('UTF-8', 'cp874', '   .....    หลา'), 0, 0);
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->Cell(20, 10, '', 5, 1); //end of line
-            $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'ลงชื่อประทับตา  .....    '), 0, 0);
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->Cell(20, 10, '', 5, 1); //end of line
-            $this->fpdf->Cell(60, 5, iconv('UTF-8', 'cp874', 'หมายเหตุ'), 0, 0);
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->Cell(20, 10, '', 5, 1); //end of line
-            $this->fpdf->Cell(80, 5, iconv('UTF-8', 'cp874', '..................................   .....    '), 0, 0);
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-            $this->fpdf->Cell(20, 10, '', 5, 1); //end of line
-            $this->fpdf->Cell(20, 5, '', 5, 1); //end of line
-
-
-
-            $this->fpdf->Output();
-            exit;
-        }
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
-    {
-        //
-
-        // print_r("1351351");
-        // $refId = $request->refId;
-        $orderdata = AstPurchaseorder::find($id);
-        // print_r($orderdata);
-        $structuredata = FabricAststructure::where('purchaseOrder', $id)->get();
-        $orderdeadline = orderdeadline::where('purchaseOrder', $id)->get();
-        $fabricdata = FabricAst::where('purchaseOrder', $id)->get();
-        $inventorydata = Inventory::where('refId', $id)->get();
-        // $imdata = $request;
-        // print_r($inventorydata);
-        //print($imdata->supplierName );
-        // print_r($refId);
-        // print_r("5555555555555555555555555555555");
-        return view('inventory.detailshow', compact('inventorydata', 'orderdata', 'structuredata', 'orderdeadline', 'fabricdata',));
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
-    {
-        //
-        $orderdata = AstPurchaseorder::find($id);
-
-        $structuredata = FabricAststructure::where('purchaseOrder', $id)->get();
-        $orderdeadline = orderdeadline::where('purchaseOrder', $id)->get();
-        $fabricdata = FabricAst::where('purchaseOrder', $id)->get();
-        // $inventoryedit = Inventory::where('id', $id)->get();
-        $inventoryedit = Inventory::find($id);
-        // print_r($inventoryedit);
-        return view('inventory.edit', compact('inventoryedit', 'orderdata', 'structuredata', 'orderdeadline', 'fabricdata',));
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $id)
-    {
-        //
-        // $request->validate([
-        //     'refId' => 'required',
-        //     'emp' => 'required',
-        //     'inventoryName' => 'required',
-        //     'orderId' => 'required',
-        //     'createDate' => 'required',
-        //     'fabricId' => 'required',
-        //     'fabricStruct' => 'required',
-        //     'fold' => 'required',
-        //     'sumYard' => 'required',
-        //     'sumM' => 'required',
-        //     'fabricW' => 'required',
-        //     'comment' => 'required'
-
-        // ]);
-        $dataUpdate = Inventory::find($id);
-        // $inventoryedit = Inventory::where('refId', $id)->get();
-        // $lastTenRecords = Material::latest()->take(10)->get();
-        // Getting values from the blade template form
-        $dataUpdate->refId = $request->get('refId');
-        $dataUpdate->emp = $request->get('emp');
-        $dataUpdate->inventoryName = $request->get('inventoryName');
-        $dataUpdate->orderId = $request->get('orderId');
-        $dataUpdate->createDate = $request->get('createDate');
-        $dataUpdate->fabricId = $request->get('fabricId');
-        $dataUpdate->fabricStruct = $request->get('fabricStruct');
-        $dataUpdate->fold = $request->get('fold');
-        $dataUpdate->sumYard = $request->get('sumYard');
-
-        $dataUpdate->sumM = $request->get('sumM');
-        $dataUpdate->fabricW = $request->get('fabricW');
-        $dataUpdate->comment = $request->get('comment');
-        $dataUpdate->save();
-
-        // return redirect('/materialstore')->with('success', 'materialstore updated.'); // -> resources/views/stocks/index.blade.php
-        // $lastTenRecords = Material::latest()->take(10)->get();
-        $ecp = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
-        $orders = AstPurchaseorder::select('id', 'customerName', 'fabricId', 'fabricStructure', 'orderSumYard', 'purchaseOrder')
-            ->whereIn('id', $ecp)
-            ->orderBy('customerName')
-            ->get();
-
-        // return view('inventory.index' , compact('orders'));
-        return $this->index();
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy($id)
-    {
-        //
-        $data = Inventory::find($id);
-        $data->delete();
-
-        // $lastTenRecords = Material::latest()->take(10)->get();
-
-        // return view('material.index', compact('lastTenRecords'));
-        return $this->index();
-    }
-
-    private function saveFabricData($data, $refId, $emp, $fabricId, $fabricStruct, $fabricPattern, $fabricW, $start, $createDate, $customer)
-    {
-        // echo   $refId .' '. $emp.' '. $fabricStruct .' '. $fabricW .' '. $start .' '. $createDate;
-        $c = $start;
-        foreach ($data as $datasave) {
-            $sf = stockfabric::create([
-                'refId' => $refId,
-                'emp' => $emp,
-                'fabricId' => $fabricId,
-                'fabricStruct' => $fabricStruct,
-                'fabricPattern' => $fabricPattern,
-                'fabricW' => $fabricW,
-                'fold' => $c,
-                'sumYard' => $datasave,
-                'createDate' => $createDate,
-                'customer' => $customer
+        if ($action === 'endData') {
+            // เคลียร์รอบ session และไปหน้า show รายการของ refId นี้
+            $gotoRef = $refId;
+
+            session()->forget([
+                'refId','endCount','sum','dt','fabricId','fabricStruct','fabricPattern','fabricW','customer',
+                'supplier_name','invoice_no','unit_price','dye_lot','location','SONumber'
             ]);
 
-            $c = $c + 1;
-            // print_r($customer);
+            return redirect()->route('fabricimport.show', $gotoRef);
         }
+
+        return back();
+    }
+
+    // แสดงรายการทั้งหมดใน refId เดียวกัน (เหมือนใบซื้อหนึ่งใบ)
+    public function show(string $refId)
+    {
+        $rows = FabricImport::where('refId', $refId)->orderBy('fold')->get();
+
+        abort_if($rows->isEmpty(), 404);
+
+        // header สรุปรวม
+        $header = [
+            'refId'         => $refId,
+            'createDate'    => optional($rows->first())->createDate?->format('d/m/Y'),
+            'supplier_name' => $rows->first()->supplier_name,
+            'invoice_no'    => $rows->first()->invoice_no,
+            'unit_price'    => $rows->first()->unit_price,
+            'dye_lot'       => $rows->first()->dye_lot,
+            'location'      => $rows->first()->location,
+            'SONumber'      => $rows->first()->SONumber,
+            'emp'           => $rows->first()->emp,
+            'fabricId'      => $rows->first()->fabricId,
+            'fabricStruct'  => $rows->first()->fabricStruct,
+            'fabricPattern' => $rows->first()->fabricPattern,
+            'fabricW'       => $rows->first()->fabricW,
+            'customer'      => $rows->first()->customer,
+            'total_folds'   => $rows->count(),
+            'total_yards'   => $rows->sum('sumYard'),
+            'total_cost'    => $rows->first()->unit_price ? $rows->sum('sumYard') * $rows->first()->unit_price : null,
+        ];
+
+        return view('fabricimport.show', compact('rows','header'));
+    }
+
+    public function index()
+    {
+        // list ตามใบ/เอกสาร (refId) ล่าสุด
+        $list = FabricImport::select('refId',
+                DB::raw('MIN(createDate) as date'),
+                DB::raw('COUNT(*) as folds'),
+                DB::raw('SUM(sumYard) as yards'),
+                DB::raw('MAX(supplier_name) as supplier'),
+                DB::raw('MAX(invoice_no) as invoice_no')
+            )
+            ->groupBy('refId')
+            ->orderByDesc('date')
+            ->paginate(20);
+
+        return view('fabricimport.index', compact('list'));
     }
 }
