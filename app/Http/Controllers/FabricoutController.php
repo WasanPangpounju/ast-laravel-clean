@@ -4,8 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
-use App\Models\Customer;
-use App\Models\fabricout;
+
+use App\Models\customer;          // คงชื่อตามโปรเจกต์เดิม
+use App\Models\fabricout;         // คงชื่อตามโปรเจกต์เดิม
 use App\Models\AstPurchaseorder;
 use App\Models\FabricAst;
 use App\Models\FabricAststructure;
@@ -20,47 +21,33 @@ class FabricoutController extends Controller
         $this->middleware('auth');
     }
 
-    /* ==========================
-     * List หน้า index
-     * ========================== */
+    /* ===================== INDEX (สรุปราย NO) ===================== */
     public function index()
     {
-        try {
-            $records = fabricout::groupBy([
-                    'vatType','vatNo','fabricStruct','no','refId',
-                    'customerName','receiveName','fabricPattern','fabricW'
-                ])
-                ->selectRaw('
-                    refId, vatNo, vatType, fabricStruct, fabricPattern, fabricW,
-                    receiveName, no, customerName,
-                    COUNT(fold) as foldCount,
-                    SUM(sumYard) as sumYardSum,
-                    MAX(createDate) as lastDate
-                ')
-                ->orderBy('vatNo', 'DESC')
-                ->get();
+        $records = fabricout::groupBy([
+                'vatType','vatNo','fabricStruct','no','refId','customerName',
+                'receiveName','fabricPattern','fabricW'
+            ])
+            ->selectRaw('
+                refId, vatNo, vatType, fabricStruct, fabricPattern, fabricW,
+                receiveName, no, customerName,
+                COUNT(fold)   AS foldCount,
+                SUM(sumYard)  AS sumYardSum,
+                MAX(createDate) AS lastDate
+            ')
+            ->orderBy('vatNo', 'DESC')
+            ->get();
 
-            $sumfabricout = $records->isEmpty() ? collect() : $records;
-            $nofind       = fabricout::select('no')->groupBy('no')->get();
-        } catch (\Exception $e) {
-            return back()->with('error', 'เกิดข้อผิดพลาดในการดึงข้อมูล: '.$e->getMessage());
-        }
+        $sumfabricout = $records ?: collect();
+        $nofind       = fabricout::select('no')->groupBy('no')->get();
 
         return view('fabricout.index', compact('sumfabricout','nofind'));
     }
 
-    /* ใช้ใน Blade เดิมบางหน้า */
-    public static function findNo()
-    {
-        return fabricout::select('no')->groupBy('no')->get();
-    }
-
-    /* ==========================
-     * Create form
-     * ========================== */
+    /* ===================== ตัวเลือกชุดสต็อก (เบาเครื่อง) ===================== */
     private function stockPickerOptions()
     {
-        $tbl = (new stockfabric())->getTable();
+        $tbl = (new \App\Models\stockfabric())->getTable();
 
         return DB::table($tbl)
             ->select('customer','fabricStruct','fabricPattern','fabricW')
@@ -74,22 +61,18 @@ class FabricoutController extends Controller
             ->get();
     }
 
+    /* ===================== CREATE ===================== */
     public function create()
     {
         if ((int)session()->get('endCount', 0) <= 0) {
             session()->forget([
                 'endCount','dt','customerName','receiveName','comment','receiveType','orderId',
                 'fabricStruct','fabricPattern','fabricW','customerReplace','fabricStructReplace',
-                'vatNo','vatType','purchaseOrder','fabricout_group'
+                'vatNo','vatType','fabricout_group'
             ]);
         }
 
-        $ecp = FabricAststructure::select('purchaseOrder AS id')
-            ->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
-
-        $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
-            ->whereIn('id', $ecp)->orderBy('customerName')->get();
-
+        // หาเลข vat แยกตามประเภท
         $lastVat = fabricout::groupBy('vatType')
             ->select('vatType', DB::raw('MAX(vatNo) as max_no'))
             ->get();
@@ -101,66 +84,71 @@ class FabricoutController extends Controller
             if ($v->vatType==='C') $vatC = $v->max_no ? $v->max_no+1 : '1001';
         }
 
+        // no ล่าสุด
         $lastRecord = fabricout::orderBy('no','DESC')->first();
         $no = $lastRecord ? ($lastRecord->no + 1) : 1001;
         if (!session()->has('no')) session()->put('no', $no);
 
-        $customers  = Customer::orderBy('name')->get();
-        $order_id   = '';
-        $customer_name = '';
-        $fabric_struct = '';
-        $stockLots  = $this->stockPickerOptions();
+        $customers = customer::orderBy('name')->get();
 
+        $ecp = FabricAststructure::select('purchaseOrder AS id')
+                ->where('yarnWRatio2', 'อนุมัติให้ผลิต')->get();
+
+        $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
+            ->whereIn('id', $ecp)->orderBy('customerName')->get();
+
+        // ตัวเลือกสต็อกแบบเบาเครื่อง
+        $stockLots = $this->stockPickerOptions();
+
+        // ค่าเลือกสต็อกใน session (ถ้ามี)
         $fg = session('fabricout_group', []);
         $selStockCustomer = $fg['stockCustomer']      ?? null;
         $selStockStruct   = $fg['stockFabricStruct']  ?? null;
         $selStockPattern  = $fg['stockFabricPattern'] ?? null;
         $selStockW        = $fg['stockFabricW']       ?? null;
 
+        $order_id = '';
+        $customer_name = '';
+        $fabric_struct = '';
+
         return view('fabricout.create', compact(
             'customers','order_id','customer_name','fabric_struct',
-            'orders','vatA','vatB','vatC','stockLots',
+            'orders','vatA','vatB','vatC',
+            'stockLots',
             'selStockCustomer','selStockStruct','selStockPattern','selStockW'
         ));
     }
 
-    /* ==========================
-     * Store / Search / Print
-     * ========================== */
+    /* ===================== STORE (รวม: สั่งใบส่ง/ค้นหา/บันทึก) ===================== */
     public function store(Request $request)
     {
         /* ---------- 0) สั่งใบส่ง (PDF) ---------- */
-        if ($request->filled('submit') && $request->submit === 'submitfabricout') {
-            // รับคีย์ให้ครบจากฟอร์ม (แนะนำให้ส่งมาใน Blade)
-            $no      = $request->integer('fabricout_no');  // fallback ถ้าไม่ส่ง vatType/vatNo
-            $vatType = $request->input('vat_type');        // A/B/C
-            $vatNo   = $request->input('vat_no');          // running no
-            $refId   = $request->input('ref_id');          // ถ้ามีจะล็อกชุดแม่นขึ้น
-
-            if ((!$vatType || !$vatNo) && !$no) {
-                return back()->with('error','ไม่พบคีย์สำหรับพิมพ์ใบส่ง');
+        if ($request->filled('submit') && $request->input('submit') === 'submitfabricout') {
+            $fabricout_no = (int) $request->input('fabricout_no', 0);
+            if (!$fabricout_no) {
+                return back()->with('error','ไม่พบเลขบิล');
             }
-            return $this->printDeliveryPdfSmart($no, $vatType, $vatNo, $refId);
+            return $this->printDeliveryPdf($fabricout_no);
         }
 
         /* ---------- 1) ค้นหา ---------- */
-        if ($request->filled('submit') && $request->submit === 'searchImport') {
+        if ($request->filled('submit') && $request->input('submit') === 'searchImport') {
             $select_search = 'findNo';
-            $searchInput   = $request->findNo ?? $request->Notype ?? '';
+            $searchInput   = $request->input('findNo') ?? $request->input('Notype') ?? '';
 
-            if (empty($request->findNo) && $request->filled('Notype')) {
-                $importFabricout = Fabricout::where('vatType','LIKE','%'.$request->Notype.'%')
+            if (empty($request->input('findNo')) && $request->filled('Notype')) {
+                $importFabricout = fabricout::where('vatType','LIKE','%'.$request->input('Notype').'%')
                     ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
                     ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
                     ->orderBy('lastDate','DESC')->get();
-            } elseif ($request->filled('findNo') && $request->Notype === 'non') {
-                $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
+            } elseif ($request->filled('findNo') && $request->input('Notype') === 'non') {
+                $importFabricout = fabricout::where('vatNo','LIKE','%'.$request->input('findNo').'%')
                     ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
                     ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
                     ->orderBy('lastDate','DESC')->get();
             } else {
-                $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
-                    ->where('vatType','LIKE','%'.$request->Notype.'%')
+                $importFabricout = fabricout::where('vatNo','LIKE','%'.$request->input('findNo').'%')
+                    ->where('vatType','LIKE','%'.$request->input('Notype').'%')
                     ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
                     ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
                     ->orderBy('lastDate','DESC')->get();
@@ -169,10 +157,10 @@ class FabricoutController extends Controller
         }
 
         /* ---------- 2) generateByOrder ---------- */
-        if ($request->filled('submit') && $request->submit === 'generateByOrder') {
-            $customers  = Customer::orderBy('name')->get();
+        if ($request->filled('submit') && $request->input('submit') === 'generateByOrder') {
+            $customers  = customer::orderBy('name')->get();
 
-            $lastRecord = Fabricout::orderBy('no','DESC')->first();
+            $lastRecord = fabricout::orderBy('no','DESC')->first();
             $no         = $lastRecord ? ($lastRecord->no + 1) : 1001;
             if (!session()->has('no')) session()->put('no', $no);
 
@@ -193,22 +181,25 @@ class FabricoutController extends Controller
 
             session()->forget('fabricout_group');
 
-            $lastVat = Fabricout::groupBy('vatType')
+            $lastVat = fabricout::groupBy('vatType')
                 ->select('vatType', DB::raw('MAX(vatNo) as max_no'))->get();
             $vatA='1001'; $vatB='1001'; $vatC='1001';
             foreach ($lastVat as $v) {
-                if ($v->vatType==='A') $vatA = $v->max_no ? $v->max_no+1 : '1001';
-                if ($v->vatType==='B') $vatB = $v->max_no ? $v->max_no+1 : '1001';
-                if ($v->vatType==='C') $vatC = $v->max_no ? $v->max_no+1 : '1001';
+                if ($v->vatType==='A') $vatA = $v->max_no ? $v->max_no + 1 : '1001';
+                if ($v->vatType==='B') $vatB = $v->max_no ? $v->max_no + 1 : '1001';
+                if ($v->vatType==='C') $vatC = $v->max_no ? $v->max_no + 1 : '1001';
             }
 
             $ecp    = FabricAststructure::select('purchaseOrder AS id')->where('yarnWRatio2','อนุมัติให้ผลิต')->get();
             $orders = AstPurchaseorder::select('id','customerName','fabricId','fabricStructure','orderSumYard','purchaseOrder')
                         ->whereIn('id',$ecp)->orderBy('customerName')->get();
 
+            // ตัวเลือกสต็อก (เบาเครื่อง)
+            $stockLots = $this->stockPickerOptions();
+
+            $order_id = $request->input('orderId');
             $customer_name = session('customerName','');
             $fabric_struct = '';
-            $stockLots     = $this->stockPickerOptions();
 
             return view('fabricout.create', compact(
                 'customers','order_id','customer_name','fabric_struct',
@@ -216,10 +207,15 @@ class FabricoutController extends Controller
             ));
         }
 
-        /* ---------- 3) ตั้งค่าพื้นฐาน + snapshot group key ---------- */
+        /* ---------- 3) เตรียมค่า & snapshot คีย์กรุ๊ป ---------- */
         $fixedDate = str_replace('/', '-', $request->input('dt') ?: date('Y-m-d'));
         $date      = date('Y-m-d', strtotime($fixedDate));
-        $val = fn(string $key) => $request->filled($key) ? trim((string)$request->input($key)) : session($key);
+
+        // helper: ถ้ามีใน request ใช้ค่านั้น ไม่งั้นตกไป session
+        $val = function(string $key) use ($request) {
+            $v = $request->input($key);
+            return (isset($v) && $v !== '') ? trim((string)$v) : session($key);
+        };
 
         if (!session()->has('fabricout_group')) {
             $snapshot = [
@@ -234,7 +230,8 @@ class FabricoutController extends Controller
                 'orderId'       => session('orderId'),
                 'purchaseOrder' => session('purchaseOrder') ?? $val('purchaseOrder'),
             ];
-            // คีย์ตัดสต็อก (fallback ถ้าไม่ได้เลือกแยก)
+
+            // กุญแจตัดสต็อก (มี fallback)
             $snapshot = array_merge($snapshot, [
                 'stockCustomer'      => $val('stockCustomer')      ?: ($val('customerName') ?: 'AST'),
                 'stockFabricStruct'  => $val('stockFabricStruct')  ?: $val('fabricStruct'),
@@ -255,15 +252,17 @@ class FabricoutController extends Controller
 
         // พับรอบนี้
         $arr_data = [];
-        foreach ($request->input('sumYard', []) as $v) {
-            if ($v !== '' && $v !== null) $arr_data[] = $v;
+        foreach ((array)$request->input('sumYard', []) as $v) {
+            if ($v !== '' && $v !== null) {
+                $arr_data[] = $v;
+            }
         }
 
-        // บันทึก 1 ก้อน
+        // ฟังก์ชันบันทึก 1 ก้อน
         $saveChunk = function(array $arr) use ($G, $date, $comment, $receiveType, $orderId, $purchaseOrder, $customerReplace, $fabricStructReplace) {
             if (empty($arr)) return;
 
-            $oldEnd    = session('endCount') ?? 0;
+            $oldEnd    = (int) (session('endCount') ?? 0);
             $startFold = ($oldEnd > 0) ? ($oldEnd + 1) : 1;
 
             // คง/สร้าง refId
@@ -280,7 +279,7 @@ class FabricoutController extends Controller
             $stockFabricPattern = $G['stockFabricPattern'] ?? $G['fabricPattern'];
             $stockFabricW       = $G['stockFabricW']       ?? $G['fabricW'];
 
-            DB::transaction(function() use ($arr, $refId, $G, $date, $comment, $receiveType, $orderId, $purchaseOrder, $customerReplace, $fabricStructReplace, $startFold, $stockCustomer, $stockFabricStruct, $stockFabricPattern, $stockFabricW) {
+            DB::transaction(function() use ($arr,$refId,$G,$date,$comment,$receiveType,$orderId,$purchaseOrder,$customerReplace,$fabricStructReplace,$startFold,$stockCustomer,$stockFabricStruct,$stockFabricPattern,$stockFabricW) {
                 $this->saveFabricData(
                     $arr,
                     $refId,
@@ -301,7 +300,6 @@ class FabricoutController extends Controller
                     $receiveType,
                     $orderId,
                     $purchaseOrder,
-                    // ตัดสต็อก
                     $stockCustomer, $stockFabricStruct, $stockFabricPattern, $stockFabricW
                 );
             });
@@ -310,7 +308,7 @@ class FabricoutController extends Controller
         };
 
         /* ---------- 4) nextData ---------- */
-        if ($request->filled('submit') && $request->submit === 'nextData') {
+        if ($request->filled('submit') && $request->input('submit') === 'nextData') {
             if (!empty($arr_data)) {
                 $total = (float)(session('sum') ?? 0) + array_sum(array_map('floatval', $arr_data));
                 session()->put('sum', $total);
@@ -330,7 +328,7 @@ class FabricoutController extends Controller
         }
 
         /* ---------- 5) endData ---------- */
-        if ($request->filled('submit') && $request->submit === 'endData') {
+        if ($request->filled('submit') && $request->input('submit') === 'endData') {
             $saveChunk($arr_data);
 
             session()->forget([
@@ -346,70 +344,51 @@ class FabricoutController extends Controller
         return back()->with('error','คำสั่งไม่ถูกต้อง');
     }
 
-    /* ==========================
-     * พิมพ์ใบส่ง: เลือกชุดอย่างแม่น
-     * ========================== */
-    private function printDeliveryPdfSmart(?int $no, ?string $vatType, ?string $vatNo, ?string $refId)
+    /* ===================== พิมพ์ใบส่ง (PDF) ===================== */
+    private function printDeliveryPdf(int $fabricout_no)
     {
-        // สร้างคิวรีพื้นฐาน
-        $base = fabricout::query();
-        if ($vatType && $vatNo) {
-            $base->where('vatType', $vatType)->where('vatNo', $vatNo);
-        }
-        if ($refId) {
-            $base->where('refId', $refId);
-        }
-        if ((!$vatType || !$vatNo) && $no) {
-            $base->where('no', $no);
-        }
-
-        // หัวบิล
-        $records = (clone $base)
+        // 1) หัวบิล
+        $records = fabricout::where('no', $fabricout_no)
             ->groupBy([
                 'vatType','vatNo','fabricStruct','fabricPattern','fabricW',
-                'no','refId','customerName','receiveName',
-                'customerReplace','fabricStructReplace','comment'
+                'no','refId','customerName','receiveName','customerReplace',
+                'fabricStructReplace','comment'
             ])
             ->selectRaw("
                 vatType, vatNo, fabricStruct, fabricPattern, fabricW,
-                no, refId, customerName, receiveName,
-                customerReplace, fabricStructReplace, comment,
+                no, refId, customerName, receiveName, customerReplace,
+                fabricStructReplace, comment,
                 COUNT(fold) AS foldCount,
                 SUM(sumYard) AS sumYardSum,
                 MAX(createDate) AS lastDate
             ")
             ->get();
 
-        if ($records->isEmpty()) {
-            return back()->with('error', 'ไม่พบข้อมูลใบส่งของสำหรับคีย์ที่เลือก');
-        }
-
-        // รายการพับ
-        $orders = (clone $base)
-            ->selectRaw('no, fold, sumYard')
-            ->orderBy('fold', 'asc')
+        // 2) ไลน์พับ
+        $orders = fabricout::selectRaw('no, fold, sumYard')
+            ->where('no', $fabricout_no)
+            ->orderBy('fold','asc')
             ->get();
 
-        return $this->renderDeliveryPdf($records[0], $orders);
-    }
+        if ($records->isEmpty()) {
+            return back()->with('error', 'ไม่พบข้อมูลใบส่งของ');
+        }
 
-    private function renderDeliveryPdf($head, $orders)
-    {
-        $pageCount = max(1, (int)ceil(($head->foldCount ?? 0) / 160));
+        $head      = $records[0];
         $vatType   = $head->vatType;
         $vatNo     = $head->vatNo;
+        $pageCount = max(1, (int)ceil(($head->foldCount ?? 0) / 160));
 
         $this->fpdf = new Fpdf;
         $this->fpdf->AddFont('THSarabunNew','', 'THSarabunNew.php');
         $this->fpdf->AddFont('THSarabunNew','B','THSarabunNew_b.php');
 
-        // ===== ส่วนหัวเอกสาร =====
         $pageOffset = 0;
-        for ($page = 1; $page <= $pageCount; $page++) {
 
+        for ($page = 1; $page <= $pageCount; $page++) {
             $this->fpdf->AddPage();
 
-            // Header (ย่อจากโค้ดเดิมของคุณ)
+            // หัวกระดาษ
             $this->fpdf->SetFont('THSarabunNew','',14);
             $this->fpdf->Cell(10, 0, '', 0, 0);
             $this->fpdf->Cell(60, 0, iconv('UTF-8','cp874', 'แผ่นที่ '.$page.' จาก ทั้งหมด '.$pageCount.' แผ่น'), 0, 0);
@@ -417,7 +396,7 @@ class FabricoutController extends Controller
             $this->fpdf->SetFont('THSarabunNew','B',20);
             $this->fpdf->Cell(80, 0, iconv('UTF-8','cp874','ใบส่งสินค้า / Delivery Note'), 0, 0);
 
-            $this->fpdf->Cell(60, 0, iconv('UTF-8','cp874','เลขที่ '.$head->vatType.' - '.$head->vatNo), 0, 0);
+            $this->fpdf->Cell(60, 0, iconv('UTF-8','cp874','เลขที่ '.$vatType.' - '.$vatNo), 0, 0);
             $this->fpdf->Ln(15);
 
             $this->fpdf->SetFont('THSarabunNew','B',16);
@@ -425,13 +404,14 @@ class FabricoutController extends Controller
 
             $orderBy = $head->customerReplace ?: $head->customerName;
             $this->fpdf->Cell(60, 5, iconv('UTF-8','cp874','ผู้สั่ง Order by : '.$orderBy), 0, 0);
+
             $this->fpdf->Cell(60, 5, '', 0, 0);
             $this->fpdf->Cell(80, 5, iconv('UTF-8','cp874','ผู้รับ Received by '.$head->receiveName), 0, 1);
 
             $this->fpdf->Ln(5);
             $this->fpdf->Cell(10, 5, '', 0, 0);
 
-            // เตรียม pattern: ตัดวงเล็บ + จับ n/m
+            // fabricPattern -> ตัดวงเล็บออก แล้วพยายามดึง n/m ถ้ามี
             $fabricPattern = (string)$head->fabricPattern;
             $cleanPattern  = preg_replace('/\(.*?\)/', '', $fabricPattern);
             $cleanPattern  = trim($cleanPattern);
@@ -452,8 +432,9 @@ class FabricoutController extends Controller
 
             $this->fpdf->Ln(2);
 
-            // ===== ตาราง 8 คอลัมน์ x 20 แถว =====
+            // ตาราง 8 คอลัมน์ x 20 แถว
             $this->fpdf->SetFont('THSarabunNew','',12);
+
             $colWidth  = $this->fpdf->GetPageWidth() / 16;
             $xStart    = $this->fpdf->GetX() + 10;
             $yStart    = $this->fpdf->GetY();
@@ -466,9 +447,10 @@ class FabricoutController extends Controller
                 $this->fpdf->Cell($colWidth, 5, iconv('UTF-8','cp874','   หลา'), 1);
             }
 
-            $y   = $yStart;
+            $y = $yStart;
             $sum = array_fill(1, 8, 0.0);
 
+            // 20 แถว x 8 คอลัมน์
             for ($row = 0; $row < 20; $row++) {
                 for ($col = 1; $col <= 8; $col++) {
                     $idx = $pageOffset + ($col - 1) * 20 + $row;
@@ -486,6 +468,7 @@ class FabricoutController extends Controller
 
                     // กล่องหลา
                     $this->fpdf->SetXY($xStart + ($colWidth - 6) * ((3 * ($col - 1)) + 1.15), $y);
+
                     if (isset($orders[$idx])) {
                         $this->fpdf->SetFont('THSarabunNew','B',18);
                         $this->fpdf->Cell($colWidth, 8, ' '.$orders[$idx]->sumYard, 1);
@@ -503,7 +486,7 @@ class FabricoutController extends Controller
                 }
             }
 
-            // รวมคอลัมน์
+            // แถวรวม
             $this->fpdf->SetFont('THSarabunNew','',12);
             for ($col = 1; $col <= 8; $col++) {
                 $xCol = $xStart + ($colWidth - 6) * (3 * ($col - 1));
@@ -513,10 +496,11 @@ class FabricoutController extends Controller
                 $this->fpdf->Cell($colWidth, 5, iconv('UTF-8','cp874', (string)$sum[$col]), 1);
             }
 
-            // สรุปรวมด้านล่าง
+            // กล่องสรุปด้านล่าง
             $this->fpdf->SetFont('THSarabunNew','B',14);
             $rowH = 6;
 
+            // รวมพับ
             $this->fpdf->SetXY(65, 220);
             $this->fpdf->Cell(0, $rowH, iconv('UTF-8','cp874','รวม'), 0, 0);
             $this->fpdf->SetFont('THSarabunNew','',14);
@@ -531,6 +515,7 @@ class FabricoutController extends Controller
             $this->fpdf->SetXY(90, 225);
             $this->fpdf->Cell(0, $rowH, iconv('UTF-8','cp874','Pieces'), 0, 0);
 
+            // รวมหลา (ขวาชิด)
             $rightMargin = 75;
             $twTotal     = $this->fpdf->GetStringWidth((string)$head->sumYardSum);
             $xPos        = $this->fpdf->GetPageWidth() - $rightMargin - $twTotal;
@@ -544,7 +529,7 @@ class FabricoutController extends Controller
             $this->fpdf->SetXY(140, 225);
             $this->fpdf->Cell(30, $rowH, iconv('UTF-8','cp874','Yards'), 0, 1);
 
-            // ช่องตัวอย่าง/ลายเซ็น/หมายเหตุ
+            // ช่องล่าง
             $this->fpdf->SetFont('THSarabunNew','B',14);
             $this->fpdf->SetXY(20, 225);
             $this->fpdf->Cell(40, 40, iconv('UTF-8','cp874','      ตัวอย่างผ้า'), 1, 0);
@@ -583,9 +568,7 @@ class FabricoutController extends Controller
         ]);
     }
 
-    /* ==========================
-     * Create records helper
-     * ========================== */
+    /* ===================== สร้างแถวบันทึก ===================== */
     private function saveFabricData(
         array $data,
         string $refId,
@@ -617,16 +600,17 @@ class FabricoutController extends Controller
                 'refId'         => $refId,
                 'emp'           => $emp,
 
+                // อ้างอิงออร์เดอร์
                 'orderId'       => $orderId,
                 'purchaseOrder' => $purchaseOrder,
 
-                // กุญแจตัดสต็อก (fallback)
+                // คีย์ตัดสต็อก
                 'stockCustomer'      => $stockCustomer      ?: ($customerName ?: 'AST'),
                 'stockFabricStruct'  => $stockFabricStruct  ?: $fabricStruct,
                 'stockFabricPattern' => $stockFabricPattern ?: $fabricPattern,
                 'stockFabricW'       => $stockFabricW       ?: $fabricW,
 
-                // แสดงผล
+                // ข้อมูลแสดงผล
                 'no'                  => $no,
                 'customerName'        => $customerName,
                 'receiveName'         => $receiveName,
@@ -646,14 +630,5 @@ class FabricoutController extends Controller
             ]);
             $c++;
         }
-    }
-
-    /* ==========================
-     * ลบทั้งชุดตาม refId
-     * ========================== */
-    public function destroy($id)
-    {
-        fabricout::where('refId', $id)->delete();
-        return $this->index();
     }
 }
