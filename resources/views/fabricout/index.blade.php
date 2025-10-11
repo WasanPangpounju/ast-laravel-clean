@@ -181,7 +181,7 @@
                                                     action="{{ route('fabricout.destroy', $findFabric->no) }}">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <input type="text" value="{{ $findFabric->refId }}"
+                                                    <input type="hidden" value="{{ $findFabric->refId }}"
                                                         name="refId">
                                                     <div style="margin: 0.2rem">
                                                         <button class="btn btn-danger" type="button"
