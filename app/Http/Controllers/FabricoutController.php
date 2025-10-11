@@ -466,6 +466,45 @@ if ($request->filled('submit') && $request->submit === 'submitfabricout') {
     return back()->with('error', 'ไม่พบ refId หรือ No สำหรับพิมพ์ใบส่ง');
 }
 
+/* ---------- 1) ค้นหา ---------- */
+if ($request->filled('submit') && $request->submit === 'searchImport') {
+    $select_search = 'findNo';
+    $searchInput   = $request->findNo ?? $request->Notype ?? '';
+
+    $base = Fabricout::query();
+
+    if (empty($request->findNo) && $request->filled('Notype')) {
+        $base->where('vatType','LIKE','%'.$request->Notype.'%');
+    } elseif ($request->filled('findNo') && $request->Notype === 'non') {
+        $base->where('vatNo','LIKE','%'.$request->findNo.'%');
+    } else {
+        $base->where('vatNo','LIKE','%'.$request->findNo.'%')
+             ->where('vatType','LIKE','%'.$request->Notype.'%');
+    }
+
+    $importFabricout = $base
+        ->select([
+            'refId', // << สำคัญ: ต้องมี
+            DB::raw('MIN(no) as no'),
+            DB::raw('MIN(vatType) as vatType'),
+            DB::raw('MIN(vatNo) as vatNo'),
+            DB::raw('MIN(customerName) as customerName'),
+            DB::raw('MIN(receiveName) as receiveName'),
+            DB::raw('MIN(fabricStruct) as fabricStruct'),
+            DB::raw('MIN(fabricPattern) as fabricPattern'),
+            DB::raw('MIN(fabricW) as fabricW'),
+            DB::raw('COUNT(fold) as foldCount'),
+            DB::raw('SUM(COALESCE(sumYard,0)) as sumYardSum'),
+            DB::raw('MAX(createDate) as lastDate'),
+        ])
+        ->groupBy('refId')          // << จบที่ refId เพื่อให้ 1 แถว = 1 ใบ (ชุดเดียวกัน)
+        ->orderBy('lastDate','DESC')
+        ->get();
+
+    return view('fabricout.index', compact('importFabricout','select_search','searchInput'));
+}
+
+
     // if ($request->filled('submit') && $request->submit === 'submitfabricout') {
     //     $fabricout_no = (int) $request->input('fabricout_no');
     //     if (!$fabricout_no) {
@@ -474,30 +513,31 @@ if ($request->filled('submit') && $request->submit === 'submitfabricout') {
     //     return $this->printDeliveryPdf($fabricout_no); // <<<<< สำคัญ: return ตรงนี้เลย
     // }
 
-    /* ---------- 1) ค้นหา ---------- */
-    if ($request->filled('submit') && $request->submit === 'searchImport') {
-        $select_search = 'findNo';
-        $searchInput   = $request->findNo ?? $request->Notype ?? '';
 
-        if (empty($request->findNo) && $request->filled('Notype')) {
-            $importFabricout = Fabricout::where('vatType','LIKE','%'.$request->Notype.'%')
-                ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
-                ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
-                ->orderBy('lastDate','DESC')->get();
-        } elseif ($request->filled('findNo') && $request->Notype === 'non') {
-            $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
-                ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
-                ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
-                ->orderBy('lastDate','DESC')->get();
-        } else {
-            $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
-                ->where('vatType','LIKE','%'.$request->Notype.'%')
-                ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
-                ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
-                ->orderBy('lastDate','DESC')->get();
-        }
-        return view('fabricout.index', compact('importFabricout','select_search','searchInput'));
-    }
+    /* ---------- 1) ค้นหา ---------- */
+    // if ($request->filled('submit') && $request->submit === 'searchImport') {
+    //     $select_search = 'findNo';
+    //     $searchInput   = $request->findNo ?? $request->Notype ?? '';
+
+    //     if (empty($request->findNo) && $request->filled('Notype')) {
+    //         $importFabricout = Fabricout::where('vatType','LIKE','%'.$request->Notype.'%')
+    //             ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
+    //             ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
+    //             ->orderBy('lastDate','DESC')->get();
+    //     } elseif ($request->filled('findNo') && $request->Notype === 'non') {
+    //         $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
+    //             ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
+    //             ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
+    //             ->orderBy('lastDate','DESC')->get();
+    //     } else {
+    //         $importFabricout = Fabricout::where('vatNo','LIKE','%'.$request->findNo.'%')
+    //             ->where('vatType','LIKE','%'.$request->Notype.'%')
+    //             ->groupBy('vatType','vatNo','fabricStruct','no','refId','customerName','receiveName','fabricPattern','fabricW')
+    //             ->selectRaw('vatType,vatNo,fabricStruct,fabricPattern,fabricW,receiveName,no,customerName,COUNT(fold) as foldCount,SUM(sumYard) as sumYardSum,MAX(createDate) as lastDate')
+    //             ->orderBy('lastDate','DESC')->get();
+    //     }
+    //     return view('fabricout.index', compact('importFabricout','select_search','searchInput'));
+    // }
 
     /* ---------- 2) generateByOrder ---------- */
     if ($request->filled('submit') && $request->submit === 'generateByOrder') {
