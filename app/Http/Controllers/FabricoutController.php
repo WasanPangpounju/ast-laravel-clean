@@ -2579,7 +2579,7 @@ private function printDeliveryPdfByRef_backup(string $refId)
 
 private function printDeliveryPdfByRef(string $refId)
 {
-    // 1) ดึงหัวบิล + ยอดรวม (ดึงด้วย refId)
+    // 1) ดึงหัวบิล + ยอดรวม
     $records = fabricout::where('refId', $refId)
         ->groupBy([
             'vatType','vatNo','fabricStruct','fabricPattern','fabricW',
@@ -2596,7 +2596,6 @@ private function printDeliveryPdfByRef(string $refId)
         ")
         ->get();
 
-    // 2) ดึงไลน์พับ (เรียงลำดับเดิม)
     $orders = fabricout::selectRaw('no, fold, sumYard')
         ->where('refId', $refId)
         ->orderBy('fold','asc')
@@ -2611,42 +2610,37 @@ private function printDeliveryPdfByRef(string $refId)
     $vatNo     = $head->vatNo;
     $pageCount = max(1, (int)ceil(($head->foldCount ?? 0) / 160));
 
-    // 3) สร้าง PDF (คงเลย์เอาต์เดิมทุกอย่าง)
-    $this->fpdf = new Fpdf;
+    $this->fpdf = new \Codedge\Fpdf\Fpdf\Fpdf;
     $this->fpdf->AddFont('THSarabunNew','', 'THSarabunNew.php');
     $this->fpdf->AddFont('THSarabunNew','B','THSarabunNew_b.php');
 
-    $pageOffset = 0; // 1 หน้า = 20 แถว x 8 คอลัมน์ = 160 รายการ
+    $pageOffset = 0;
 
     for ($page = 1; $page <= $pageCount; $page++) {
 
         $this->fpdf->AddPage();
 
-        // หัวกระดาษ
+        // Header
         $this->fpdf->SetFont('THSarabunNew','',14);
         $this->fpdf->Cell(10, 0, '', 0, 0);
         $this->fpdf->Cell(60, 0, iconv('UTF-8','cp874', 'แผ่นที่ '.$page.' จาก ทั้งหมด '.$pageCount.' แผ่น'), 0, 0);
-
         $this->fpdf->SetFont('THSarabunNew','B',20);
         $this->fpdf->Cell(80, 0, iconv('UTF-8','cp874','ใบส่งสินค้า / Delivery Note'), 0, 0);
-
         $this->fpdf->Cell(60, 0, iconv('UTF-8','cp874','เลขที่ '.$vatType.' - '.$vatNo), 0, 0);
         $this->fpdf->Ln(15);
 
         $this->fpdf->SetFont('THSarabunNew','B',16);
         $this->fpdf->Cell(10, 5, '', 0, 0);
 
-        // ผู้สั่ง (ใช้ customerReplace ถ้ามี ไม่งั้นใช้ customerName)
         $orderBy = $head->customerReplace ?: $head->customerName;
         $this->fpdf->Cell(60, 5, iconv('UTF-8','cp874','ผู้สั่ง Order by : '.$orderBy), 0, 0);
-
         $this->fpdf->Cell(60, 5, '', 0, 0);
         $this->fpdf->Cell(80, 5, iconv('UTF-8','cp874','ผู้รับ Received by '.$head->receiveName), 0, 1);
 
         $this->fpdf->Ln(5);
         $this->fpdf->Cell(10, 5, '', 0, 0);
 
-        // เตรียม pattern สำหรับหัวบิล (ตัดวงเล็บออก และถ้ามีรูปแบบ n/m ให้ดึงออกมา)
+        // Fabric pattern
         $fabricPattern = (string)$head->fabricPattern;
         $cleanPattern  = preg_replace('/\(.*?\)/', '', $fabricPattern);
         $cleanPattern  = trim($cleanPattern);
@@ -2660,54 +2654,50 @@ private function printDeliveryPdfByRef(string $refId)
         if (!empty($head->fabricStructReplace)) {
             $codeLine = 'รหัสผ้า Code : '.$head->fabricStructReplace;
         }
-        $this->fpdf->Cell(60, 5, iconv('UTF-8','cp874', $codeLine), 0, 0);
 
+        $this->fpdf->Cell(60, 5, iconv('UTF-8','cp874', $codeLine), 0, 0);
         $this->fpdf->Cell(60, 5, '', 0, 0);
         $this->fpdf->Cell(80, 5, iconv('UTF-8','cp874','วันที่ Date : '.date('d/m/Y', strtotime($head->lastDate))), 0, 1);
 
         $this->fpdf->Ln(2);
 
-        // ตาราง 8 คอลัมน์ (ลำดับ / หลา) x 20 แถว
+        // ========== ตาราง ==========
         $this->fpdf->SetFont('THSarabunNew','',12);
 
         $colWidth  = $this->fpdf->GetPageWidth() / 16;
         $xStart    = $this->fpdf->GetX() + 10;
-        $yStart    = $this->fpdf->GetY();
+        $yStart    = $this->fpdf->GetY() + 3; // ขยับลงเล็กน้อย
 
-        // หัวคอลัมน์
+        // หัวคอลัมน์ (ไม่ใช้ -5 แล้ว)
+        $headerY = $yStart;
         for ($i = 0; $i < 8; $i++) {
-            $this->fpdf->SetXY($xStart + ($colWidth - 6) * (3 * $i), $yStart - 5);
+            $this->fpdf->SetXY($xStart + ($colWidth - 6) * (3 * $i), $headerY);
             $this->fpdf->Cell($colWidth - 5, 5, iconv('UTF-8','cp874','ลำดับ'), 1);
-            $this->fpdf->SetXY($xStart + ($colWidth - 6) * ((3 * $i) + 1.15), $yStart - 5);
+            $this->fpdf->SetXY($xStart + ($colWidth - 6) * ((3 * $i) + 1.15), $headerY);
             $this->fpdf->Cell($colWidth, 5, iconv('UTF-8','cp874','   หลา'), 1);
         }
 
-        $y = $yStart;
-
-        // รวมแต่ละคอลัมน์
+        // เริ่มข้อมูลหลังหัวตาราง
+        $y = $headerY + 5;
         $sum = array_fill(1, 8, 0.0);
 
-        // วาด 20 แถว x 8 คอลัมน์
         for ($row = 0; $row < 20; $row++) {
             for ($col = 1; $col <= 8; $col++) {
-                // index ใน $orders สำหรับช่องนี้
                 $idx = $pageOffset + ($col - 1) * 20 + $row;
 
                 // กล่องลำดับ
                 $this->fpdf->SetXY($xStart + ($colWidth - 6) * (3 * ($col - 1)), $y);
-                $this->fpdf->Cell($colWidth - 5, 8, iconv('UTF-8','cp874',''), 1);
+                $this->fpdf->Cell($colWidth - 5, 8, '', 1);
 
-                // ลำดับ (ขวาชิด)
-                $rightMargin = 185;
-                $seq         = $idx + 1;
-                $tw          = $this->fpdf->GetStringWidth((string)$seq);
-                $xPos        = $this->fpdf->GetPageWidth() - $rightMargin - $tw;
-                $this->fpdf->SetXY($xPos + ($colWidth - 6) * (3 * ($col - 1)), $y);
-                $this->fpdf->Cell($colWidth - 5, 8, iconv('UTF-8','cp874',(string)$seq), 0, 0);
+                // ลำดับ
+                if (isset($orders[$idx])) {
+                    $seq = $idx + 1;
+                    $this->fpdf->SetXY($xStart + ($colWidth - 6) * (3 * ($col - 1)) + 1, $y + 1);
+                    $this->fpdf->Cell($colWidth - 5, 6, iconv('UTF-8','cp874',$seq), 0, 0, 'L');
+                }
 
                 // กล่องหลา
                 $this->fpdf->SetXY($xStart + ($colWidth - 6) * ((3 * ($col - 1)) + 1.15), $y);
-
                 if (isset($orders[$idx])) {
                     $this->fpdf->SetFont('THSarabunNew','B',18);
                     $this->fpdf->Cell($colWidth, 8, ' '.$orders[$idx]->sumYard, 1);
@@ -2717,16 +2707,10 @@ private function printDeliveryPdfByRef(string $refId)
                     $this->fpdf->Cell($colWidth, 8, '', 1);
                 }
             }
-
             $y += 8;
-            if ($y > $this->fpdf->GetPageHeight() - 40) {
-                // เผื่อ
-                $this->fpdf->AddPage();
-                $y = 40;
-            }
         }
 
-        // แถว "รวม" ของแต่ละคอลัมน์
+        // รวมท้ายคอลัมน์
         $this->fpdf->SetFont('THSarabunNew','',12);
         for ($col = 1; $col <= 8; $col++) {
             $xCol = $xStart + ($colWidth - 6) * (3 * ($col - 1));
@@ -2736,11 +2720,9 @@ private function printDeliveryPdfByRef(string $refId)
             $this->fpdf->Cell($colWidth, 5, iconv('UTF-8','cp874', (string)$sum[$col]), 1);
         }
 
-        // กล่องสรุปรวมด้านล่าง
+        // ======= ส่วนท้าย (รวม/ลายเซ็น/หมายเหตุ) =======
         $this->fpdf->SetFont('THSarabunNew','B',14);
         $rowH = 6;
-
-        // รวมพับ
         $this->fpdf->SetXY(65, 220);
         $this->fpdf->Cell(0, $rowH, iconv('UTF-8','cp874','รวม'), 0, 0);
         $this->fpdf->SetFont('THSarabunNew','',14);
@@ -2755,7 +2737,6 @@ private function printDeliveryPdfByRef(string $refId)
         $this->fpdf->SetXY(90, 225);
         $this->fpdf->Cell(0, $rowH, iconv('UTF-8','cp874','Pieces'), 0, 0);
 
-        // รวมหลา (ขวาชิด)
         $rightMargin = 75;
         $twTotal     = $this->fpdf->GetStringWidth((string)$head->sumYardSum);
         $xPos        = $this->fpdf->GetPageWidth() - $rightMargin - $twTotal;
@@ -2769,7 +2750,6 @@ private function printDeliveryPdfByRef(string $refId)
         $this->fpdf->SetXY(140, 225);
         $this->fpdf->Cell(30, $rowH, iconv('UTF-8','cp874','Yards'), 0, 1);
 
-        // ช่องตัวอย่าง/ลายเซ็น/หมายเหตุ
         $this->fpdf->SetFont('THSarabunNew','B',14);
         $this->fpdf->SetXY(20, 225);
         $this->fpdf->Cell(40, 40, iconv('UTF-8','cp874','      ตัวอย่างผ้า'), 1, 0);
@@ -2786,7 +2766,6 @@ private function printDeliveryPdfByRef(string $refId)
         $this->fpdf->SetFont('THSarabunNew','B',14);
         $this->fpdf->SetXY(65, 255);
         $this->fpdf->Cell(60, 5, iconv('UTF-8','cp874','หมายเหตุ'), 0, 0);
-
         $this->fpdf->SetFont('THSarabunNew','',12);
         $this->fpdf->SetXY(65, 260);
         $note = $head->comment ?: 'ได้รับผ้าตามรายการข้างบนนี้ไว้ถูกต้องและเรียบร้อยแล้ว';
@@ -2794,12 +2773,10 @@ private function printDeliveryPdfByRef(string $refId)
         $this->fpdf->SetXY(65, 265);
         $this->fpdf->Cell(80, 5, iconv('UTF-8','cp874','Received the above goods in good order and condition'), 0, 1);
 
-        // ชดเชย offset สำหรับหน้าไปต่อไป (20 แถว x 8 คอลัมน์)
         $pageOffset += 160;
     }
 
-    // 4) ส่งออกเป็นสตรีม
-    $pdfBinary = $this->fpdf->Output('S'); // S = เป็นสตริง
+    $pdfBinary = $this->fpdf->Output('S');
     $filename  = "Delivery_{$vatType}-{$vatNo}.pdf";
 
     return response($pdfBinary, 200, [
