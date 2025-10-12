@@ -1,78 +1,129 @@
+{{-- resources/views/stockfabric/inspect.blade.php --}}
 @extends('layouts.astmanufacturing')
 
 @section('content')
 <div class="content-wrapper">
+  <div class="">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/home">หน้าหลัก</a></li>
+      <li class="breadcrumb-item"><a href="{{ route('stockfabric.index') }}">สต็อกผ้า</a></li>
+      <li class="breadcrumb-item active">ตรวจสอบสต็อก (รายการแถว)</li>
+    </ol>
+  </div>
+
   <div class="content-header">
     <div class="container-fluid">
-      <h1 class="m-0">ตรวจสอบรายการสต็อกเข้า</h1>
-      <p class="text-muted">
-        ลูกค้า: <b>{{ $key['customer'] ?: '-' }}</b> |
-        Fabric ID: <b>{{ $key['fabricId'] ?: '-' }}</b> |
-        โครงสร้าง: <b>{{ $key['fabricStruct'] ?: '-' }}</b> |
-        ลาย: <b>{{ $key['fabricPattern'] ?: '-' }}</b> |
-        หน้ากว้าง: <b>{{ $key['fabricW'] ?: '-' }}</b>
-      </p>
+      <div class="row mb-2">
+        <h1 class="m-0">
+          <i class="nav-icon fas fa fa-arrow-circle-right"></i>
+          ตรวจสอบสต็อก: รายการที่ตรงเงื่อนไข
+        </h1>
+      </div>
+    </div>
+  </div>
 
-      {{-- ลบทั้งหมด --}}
-      <form action="{{ route('stockfabric.destroyInBulk') }}" method="post" onsubmit="return confirm('ยืนยันลบทั้งหมด?')">
-        @csrf
-        @method('DELETE')
-        <input type="hidden" name="customer"      value="{{ $key['customer'] }}">
-        <input type="hidden" name="fabricId"      value="{{ $key['fabricId'] }}">
-        <input type="hidden" name="fabricStruct"  value="{{ $key['fabricStruct'] }}">
-        <input type="hidden" name="fabricPattern" value="{{ $key['fabricPattern'] }}">
-        <input type="hidden" name="fabricW"       value="{{ $key['fabricW'] }}">
-        <button type="submit" class="btn btn-danger mb-3">ลบทั้งหมด</button>
-        <a href="{{ route('stockfabric.index') }}" class="btn btn-secondary mb-3">กลับหน้าเดิม</a>
-      </form>
+  <div class="content">
+    <div class="box-from">
+      <h2 class="title"><i class="fa fa-caret-right"></i> รายการสต็อกเข้า (Stock-In)</h2>
 
-      @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
-      @endif
+      {{-- แถบเครื่องมือบนหัวตาราง --}}
+      <div class="d-flex justify-content-between align-items-center mb-3" style="gap: .5rem; flex-wrap: wrap;">
+        <div>
+          {{-- เงื่อนไขที่ใช้ค้นหา --}}
+          @isset($key)
+            <div class="small text-muted">
+              <strong>เงื่อนไข:</strong>
+              @php
+                $parts = [];
+                if(!empty($key['customer']))      $parts[] = 'ลูกค้า: '.$key['customer'];
+                if(!empty($key['fabricId']))      $parts[] = 'รหัสผ้า: '.$key['fabricId'];
+                if(!empty($key['fabricStruct']))  $parts[] = 'โครงสร้าง: '.$key['fabricStruct'];
+                if(!empty($key['fabricPattern'])) $parts[] = 'ลาย: '.$key['fabricPattern'];
+                if(!empty($key['fabricW']))       $parts[] = 'หน้ากว้าง: '.$key['fabricW'];
+              @endphp
+              {{ count($parts) ? implode(' , ', $parts) : 'ทั้งหมด' }}
+            </div>
+          @endisset
+        </div>
 
-      <div class="card">
-        <div class="card-body table-responsive">
-          <table class="table table-bordered table-striped">
-            <thead class="bg-light">
+        <div class="d-flex" style="gap:.5rem;">
+          {{-- ลบทั้งหมดตามชุดเงื่อนไข --}}
+          <form method="post" action="{{ route('stockfabric.destroyInBulk') }}"
+                onsubmit="return confirm('ต้องการลบรายการทั้งหมดในชุดนี้หรือไม่? การลบไม่สามารถย้อนกลับได้');">
+            @csrf
+            @method('DELETE')
+            <input type="hidden" name="customer"      value="{{ $key['customer']      ?? '' }}">
+            <input type="hidden" name="fabricId"      value="{{ $key['fabricId']      ?? '' }}">
+            <input type="hidden" name="fabricStruct"  value="{{ $key['fabricStruct']  ?? '' }}">
+            <input type="hidden" name="fabricPattern" value="{{ $key['fabricPattern'] ?? '' }}">
+            <input type="hidden" name="fabricW"       value="{{ $key['fabricW']       ?? '' }}">
+            <button class="btn btn-danger" type="submit">ลบทั้งหมดในชุดนี้</button>
+          </form>
+
+          <a href="{{ route('stockfabric.index') }}" class="btn b_order">กลับ</a>
+        </div>
+      </div>
+
+      {{-- ตารางรายการ --}}
+      <div class="row">
+        <div class="col-12 table-responsive">
+          <table class="table table-bordered table-a" style="width:100%">
+            <thead style="position: sticky;top: 0;background-color:powderblue;">
               <tr>
-                <th style="width:90px">ลบ</th>
-                <th>ID</th>
-                <th>วันที่</th>
-                <th>ผู้บันทึก</th>
-                <th>Customer</th>
-                <th>Fabric ID</th>
+                <th style="width:6rem;">ID</th>
+                <th style="width:8rem;">วันที่</th>
+                <th>ลูกค้า</th>
+                <th>รหัสผ้า</th>
                 <th>โครงสร้าง</th>
                 <th>ลาย</th>
-                <th>หน้ากว้าง</th>
-                <th>พับ</th>
-                <th>หลา</th>
-                <th>refId</th>
+                <th style="width:7rem;">หน้ากว้าง</th>
+                <th style="width:5rem;">พับ</th>
+                <th style="width:6rem;">หลา</th>
+                <th style="width:9rem;">ผู้บันทึก</th>
+                <th style="width:6rem;">ลบ</th>
               </tr>
             </thead>
-            <tbody style="text-align:right">
-              @forelse($ins as $r)
+            <tbody style="text-align:right;">
+              @forelse ($ins as $row)
                 <tr>
-                  <td style="text-align:center">
-                    <form action="{{ route('stockfabric.destroyIn', $r->id) }}" method="post" onsubmit="return confirm('ลบแถวนี้?')">
+                  <td style="text-align:center;">{{ $row->id }}</td>
+                  <td>
+                    {{ $row->createDate ? \Carbon\Carbon::parse($row->createDate)->format('d/m/Y') : '' }}
+                  </td>
+                  <td style="text-align:left;">
+                    {{ $row->customer ?: 'AST' }}
+                  </td>
+                  <td style="text-align:left;">
+                    {{ $row->fabricId }}
+                  </td>
+                  <td style="text-align:left;">
+                    {{ $row->fabricStruct }}
+                  </td>
+                  <td style="text-align:left;">
+                    {{ $row->fabricPattern }}
+                  </td>
+                  <td style="text-align:center;">
+                    {{ $row->fabricW }}
+                  </td>
+                  <td>{{ number_format((float)$row->fold, 0) }}</td>
+                  <td>{{ rtrim(rtrim(number_format((float)$row->sumYard, 2, '.', ''), '0'), '.') }}</td>
+                  <td style="text-align:left;">
+                    {{ $row->emp ?? '-' }}
+                  </td>
+                  <td style="text-align:center;">
+                    <form method="post"
+                          action="{{ route('stockfabric.destroyIn', $row->id) }}"
+                          onsubmit="return confirm('ต้องการลบรายการ ID {{ $row->id }} หรือไม่?');">
                       @csrf
                       @method('DELETE')
-                      <button type="submit" class="btn btn-sm btn-outline-danger">ลบ</button>
+                      <button class="btn btn-danger btn-sm" type="submit">ลบ</button>
                     </form>
                   </td>
-                  <td style="text-align:center">{{ $r->id }}</td>
-                  <td>{{ \Carbon\Carbon::parse($r->createDate)->format('d/m/Y') }}</td>
-                  <td style="text-align:left">{{ $r->emp }}</td>
-                  <td style="text-align:left">{{ $r->customer ?: 'AST' }}</td>
-                  <td style="text-align:left">{{ $r->fabricId }}</td>
-                  <td style="text-align:left">{{ $r->fabricStruct }}</td>
-                  <td style="text-align:left">{{ $r->fabricPattern }}</td>
-                  <td style="text-align:left">{{ $r->fabricW }}</td>
-                  <td>{{ number_format($r->fold) }}</td>
-                  <td>{{ number_format($r->sumYard, 2) }}</td>
-                  <td style="text-align:left">{{ $r->refId }}</td>
                 </tr>
               @empty
-                <tr><td colspan="12" class="text-center text-muted">ไม่พบรายการ</td></tr>
+                <tr>
+                  <td colspan="11" class="text-center">ไม่พบรายการ</td>
+                </tr>
               @endforelse
             </tbody>
           </table>
