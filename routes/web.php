@@ -76,15 +76,25 @@ Route::delete('/fabricimport-check/{refId}', [FabricimportController::class, 'ch
 
 Route::resource('ordershipped', OrdershippedController::class );
 
-Route::post('/stockfabric/inspect', [StockfabricController::class, 'inspect'])->name('stockfabric.inspect');
+// web.php
+// ✅ เปลี่ยน path จาก /stockfabric/inspect → /stockfabric-check
+Route::post('/stockfabric-check', [StockfabricController::class, 'inspect'])->name('stockfabric.inspect');
 
-// ลบรายการสต็อกเข้าแบบรายแถว
 Route::delete('/stockfabric/in/{id}', [StockfabricController::class, 'destroyIn'])->name('stockfabric.destroyIn');
-
-// ลบรายการสต็อกเข้าแบบทั้งชุด (ตามคีย์ที่เลือก)
 Route::delete('/stockfabric/in/bulk', [StockfabricController::class, 'destroyInBulk'])->name('stockfabric.destroyInBulk');
 
+// resource ไว้ล่างสุด
 Route::resource('stockfabric', StockfabricController::class );
+
+// Route::post('/stockfabric/inspect', [StockfabricController::class, 'inspect'])->name('stockfabric.inspect');
+
+// // ลบรายการสต็อกเข้าแบบรายแถว
+// Route::delete('/stockfabric/in/{id}', [StockfabricController::class, 'destroyIn'])->name('stockfabric.destroyIn');
+
+// // ลบรายการสต็อกเข้าแบบทั้งชุด (ตามคีย์ที่เลือก)
+// Route::delete('/stockfabric/in/bulk', [StockfabricController::class, 'destroyInBulk'])->name('stockfabric.destroyInBulk');
+
+// Route::resource('stockfabric', StockfabricController::class );
 
 Route::resource('fabricout', FabricoutController::class );
 Route::resource('fabricdeposit', FabricdepositController::class );
