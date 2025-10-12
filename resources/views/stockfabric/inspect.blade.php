@@ -49,6 +49,16 @@
         <div class="d-flex" style="gap:.5rem;">
           {{-- ลบทั้งหมดตามชุดเงื่อนไข --}}
           <form method="post" action="{{ route('stockfabric.destroyInBulk') }}"
+      onsubmit="return confirm('ต้องการลบรายการทั้งหมดในชุดนี้หรือไม่? การลบไม่สามารถย้อนกลับได้');">
+    @csrf
+    @method('DELETE')
+    @foreach($ins as $row)
+        <input type="hidden" name="ids[]" value="{{ $row->id }}">
+    @endforeach
+    <button class="btn btn-danger" type="submit">ลบทั้งหมดในชุดนี้</button>
+</form>
+
+{{--          <form method="post" action="{{ route('stockfabric.destroyInBulk') }}"
                 onsubmit="return confirm('ต้องการลบรายการทั้งหมดในชุดนี้หรือไม่? การลบไม่สามารถย้อนกลับได้');">
             @csrf
             @method('DELETE')
@@ -59,6 +69,7 @@
             <input type="hidden" name="fabricW"       value="{{ $key['fabricW']       ?? '' }}">
             <button class="btn btn-danger" type="submit">ลบทั้งหมดในชุดนี้</button>
           </form>
+}}
 
           <a href="{{ route('stockfabric.index') }}" class="btn b_order">กลับ</a>
         </div>

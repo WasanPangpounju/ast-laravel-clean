@@ -324,6 +324,23 @@ public function destroyIn($id)
 /** ลบสต็อกเข้าแบบทั้งชุด (ตามคีย์ที่เลือก) */
 public function destroyInBulk(Request $request)
 {
+    $ids = $request->input('ids', []);
+
+    if (empty($ids)) {
+        return redirect()->route('stockfabric.index')
+            ->with('error', 'ไม่พบรายการที่จะลบ');
+    }
+
+    $deleted = \DB::table('stockfabrics')
+        ->whereIn('id', $ids)
+        ->delete();
+
+    return redirect()->route('stockfabric.index')
+        ->with('success', "ลบรายการทั้งหมดแล้ว ($deleted แถว)");
+}
+
+public function destroyInBulk_backup(Request $request)
+{
     $customer      = $request->input('customer');
     $fabricId      = $request->input('fabricId');
     $fabricStruct  = $request->input('fabricStruct');
