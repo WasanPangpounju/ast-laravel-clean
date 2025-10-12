@@ -81,13 +81,14 @@ Route::get('/stockfabric-check', [StockfabricController::class, 'inspectGet'])
     ->name('stockfabric.inspect.get');
 
 // ✅ POST สำหรับตอนกดปุ่ม "ตรวจสอบ"
-Route::post('/stockfabric-check', [StockfabricController::class, 'inspect'])
-    ->name('stockfabric.inspect');
+// Route::post('/stockfabric-check', [StockfabricController::class, 'inspect'])
+//     ->name('stockfabric.inspect');
 
 // ✅ เปลี่ยน path จาก /stockfabric/inspect → /stockfabric-check
 Route::post('/stockfabric-check', [StockfabricController::class, 'inspect'])->name('stockfabric.inspect');
 
 Route::delete('/stockfabric/in/{id}', [StockfabricController::class, 'destroyIn'])->name('stockfabric.destroyIn');
+
 Route::delete('/stockfabric/in/bulk', [StockfabricController::class, 'destroyInBulk'])->name('stockfabric.destroyInBulk');
 
 // resource ไว้ล่างสุด

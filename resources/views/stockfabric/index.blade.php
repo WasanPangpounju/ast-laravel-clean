@@ -155,7 +155,7 @@
                                 <td>{{ $data->sumYardRemaining }}</td>
 
                                 <td>
-                                    <form method="post" action="{{ route('stockfabric.inspect') }}" target="_blank">
+                                    <form method="post" action="{{ route('stockfabric.inspect') }}" >
     @csrf
     <input type="hidden" name="customer"      value="{{ $data->customer }}">
     <input type="hidden" name="fabricId"      value="{{ $data->fabricId }}">
