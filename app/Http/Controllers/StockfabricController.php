@@ -259,4 +259,88 @@ private function getCombinedData($customer = null, $fabricStruct = null, $fabric
 
         return $combinedData;
     }
+
+
+public function inspect(Request $request)
+{
+    // รับคีย์ที่ใช้ “เลือกชุดผ้า”
+    $customer      = $request->input('customer');
+    $fabricId      = $request->input('fabricId');
+    $fabricStruct  = $request->input('fabricStruct');
+    $fabricPattern = $request->input('fabricPattern');
+    $fabricW       = $request->input('fabricW');
+
+    // ทำให้คีย์อยู่ในรูป normalize เดียวกันกับตอนรวมสต็อก
+    $normCustomer      = $customer ? trim($customer) : null;
+    $normFabricId      = $fabricId ? trim($fabricId) : null;
+    $normFabricStruct  = $fabricStruct ? trim($fabricStruct) : null;
+    $normFabricPattern = $fabricPattern ? trim($fabricPattern) : null;
+    $normFabricW       = $fabricW ? trim($fabricW) : null;
+
+    // ดึง “สต็อกเข้า (stockfabrics)” รายแถว ที่เข้าข่ายคีย์นี้ทั้งหมด
+    $ins = \DB::table('stockfabrics')
+        ->select('id','customer','fabricId','fabricStruct','fabricPattern','fabricW','fold','sumYard','createDate','emp','refId')
+        ->when($normCustomer,      fn($q) => $q->where(\DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"), 'LIKE', '%'.$normCustomer.'%'))
+        ->when($normFabricId,      fn($q) => $q->where('fabricId',      'LIKE', '%'.$normFabricId.'%'))
+        ->when($normFabricStruct,  fn($q) => $q->where(\DB::raw('TRIM(fabricStruct)'),  'LIKE', '%'.$normFabricStruct.'%'))
+        ->when($normFabricPattern, fn($q) => $q->where(\DB::raw('TRIM(fabricPattern)'), 'LIKE', '%'.$normFabricPattern.'%'))
+        ->when($normFabricW,       fn($q) => $q->where(\DB::raw('TRIM(fabricW)'),       'LIKE', '%'.$normFabricW.'%'))
+        ->orderBy('createDate','desc')
+        ->orderBy('id','desc')
+        ->get();
+
+    // (ถ้าต้องโชว์สต็อกออกด้วย ให้เพิ่มได้) — ตัวอย่าง comment ไว้ก่อน
+    // $outs = \DB::table('fabricouts')
+    //     ->select('id','refId','customerName','stockCustomer','fabricStruct','stockFabricStruct','fabricPattern','stockFabricPattern','fabricW','stockFabricW','fold','sumYard','createDate','emp')
+    //     ->where(function($q) use ($normCustomer) {
+    //         if ($normCustomer) {
+    //             $q->where(\DB::raw("COALESCE(NULLIF(TRIM(stockCustomer), ''), COALESCE(NULLIF(TRIM(customerName), ''), 'AST'))"), 'LIKE', '%'.$normCustomer.'%');
+    //         }
+    //     })
+    //     ->when($normFabricStruct,  fn($q) => $q->where(\DB::raw("TRIM(COALESCE(NULLIF(stockFabricStruct,''), fabricStruct))"),  'LIKE', '%'.$normFabricStruct.'%'))
+    //     ->when($normFabricPattern, fn($q) => $q->where(\DB::raw("TRIM(COALESCE(NULLIF(stockFabricPattern,''), fabricPattern))"), 'LIKE', '%'.$normFabricPattern.'%'))
+    //     ->when($normFabricW,       fn($q) => $q->where(\DB::raw("TRIM(COALESCE(NULLIF(stockFabricW,''), fabricW))"),            'LIKE', '%'.$normFabricW.'%'))
+    //     ->orderBy('createDate','desc')->orderBy('id','desc')->get();
+
+    // ส่งคีย์กลับไปที่ view เพื่อใช้ปุ่ม “ลบทั้งหมด”
+    $key = [
+        'customer'      => $customer,
+        'fabricId'      => $fabricId,
+        'fabricStruct'  => $fabricStruct,
+        'fabricPattern' => $fabricPattern,
+        'fabricW'       => $fabricW,
+    ];
+
+    return view('stockfabric.inspect', compact('ins','key'));
+}
+
+/** ลบสต็อกเข้าแบบรายแถว */
+public function destroyIn($id)
+{
+    \DB::table('stockfabrics')->where('id',$id)->delete();
+    return back()->with('success','ลบรายการเรียบร้อย');
+}
+
+/** ลบสต็อกเข้าแบบทั้งชุด (ตามคีย์ที่เลือก) */
+public function destroyInBulk(Request $request)
+{
+    $customer      = $request->input('customer');
+    $fabricId      = $request->input('fabricId');
+    $fabricStruct  = $request->input('fabricStruct');
+    $fabricPattern = $request->input('fabricPattern');
+    $fabricW       = $request->input('fabricW');
+
+    $q = \DB::table('stockfabrics');
+
+    if ($customer)      $q->where(\DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"), 'LIKE', '%'.trim($customer).'%');
+    if ($fabricId)      $q->where('fabricId', 'LIKE', '%'.trim($fabricId).'%');
+    if ($fabricStruct)  $q->where(\DB::raw('TRIM(fabricStruct)'), 'LIKE', '%'.trim($fabricStruct).'%');
+    if ($fabricPattern) $q->where(\DB::raw('TRIM(fabricPattern)'), 'LIKE', '%'.trim($fabricPattern).'%');
+    if ($fabricW)       $q->where(\DB::raw('TRIM(fabricW)'), 'LIKE', '%'.trim($fabricW).'%');
+
+    $deleted = $q->delete();
+
+    return back()->with('success', "ลบรายการทั้งหมดแล้ว ($deleted แถว)");
+}
+    
 }

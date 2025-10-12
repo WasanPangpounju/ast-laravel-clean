@@ -76,6 +76,15 @@ Route::delete('/fabricimport-check/{refId}', [FabricimportController::class, 'ch
 
 Route::resource('ordershipped', OrdershippedController::class );
 Route::resource('stockfabric', StockfabricController::class );
+
+Route::post('/stockfabric/inspect', [StockfabricController::class, 'inspect'])->name('stockfabric.inspect');
+
+// ลบรายการสต็อกเข้าแบบรายแถว
+Route::delete('/stockfabric/in/{id}', [StockfabricController::class, 'destroyIn'])->name('stockfabric.destroyIn');
+
+// ลบรายการสต็อกเข้าแบบทั้งชุด (ตามคีย์ที่เลือก)
+Route::delete('/stockfabric/in/bulk', [StockfabricController::class, 'destroyInBulk'])->name('stockfabric.destroyInBulk');
+
 Route::resource('fabricout', FabricoutController::class );
 Route::resource('fabricdeposit', FabricdepositController::class );
 

@@ -128,7 +128,7 @@
                             <th colspan="2">ผลิตแล้ว </th>
                             <th colspan="2">ใช้ไป </th>
                             <th colspan="2">คงเหลือ</th>
-                            <th rowspan="2">ส่งออร์เดอร์</th>
+                            <th rowspan="2">รายละเอียด</th>
                         </tr>
                         <tr>
                             <th>จำนวนพับ </th>
@@ -155,7 +155,17 @@
                                 <td>{{ $data->sumYardRemaining }}</td>
 
                                 <td>
-                                    <form method="post" action="{{ route('fabriccheck.store') }}">
+                                    <form method="post" action="{{ route('stockfabric.inspect') }}" target="_blank">
+    @csrf
+    <input type="hidden" name="customer"      value="{{ $data->customer }}">
+    <input type="hidden" name="fabricId"      value="{{ $data->fabricId }}">
+    <input type="hidden" name="fabricStruct"  value="{{ $data->fabricStruct }}">
+    <input type="hidden" name="fabricPattern" value="{{ $data->fabricPattern }}">
+    <input type="hidden" name="fabricW"       value="{{ $data->fabricW }}">
+    <button type="submit" class="btn_search">ตรวจสอบ</button>
+</form>
+
+                                    <!-- <form method="post" action="{{ route('fabriccheck.store') }}">
     @csrf
     <input type="hidden" name="customer"      value="{{ $data->customer }}">
     <input type="hidden" name="fabricId"      value="{{ $data->fabricId }}"><!-- เพิ่ม -->
@@ -163,7 +173,7 @@
     <input type="hidden" name="fabricPattern" value="{{ $data->fabricPattern }}">
     <input type="hidden" name="fabricW"       value="{{ $data->fabricW }}">
     <button name="submit" value="searchImport" class="btn_search">ตรวจสอบ</button>
-</form>
+</form> -->
 
 </td>
 
@@ -175,7 +185,7 @@
                                         <input type="hidden" name="fabricW" value="{{ $data->fabricW }}">
                                         <input type="hidden" name="customer" value="{{ $data->customer }}">
                                         <input type="hidden" name="fabricId" value="{{ $data->fabricId }}">
-                                        <button name="submit" value="searchImport" class="btn_search">ส่งออร์เดอร์</button>
+                                        <button name="submit" value="searchImport" class="btn_search">ตรวจสอบ</button>
                                     </form>
                                 </td> -->
                             </tr>
