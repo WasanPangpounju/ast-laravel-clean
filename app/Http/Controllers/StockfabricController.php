@@ -342,5 +342,16 @@ public function destroyInBulk(Request $request)
 
     return back()->with('success', "ลบรายการทั้งหมดแล้ว ($deleted แถว)");
 }
-    
+
+public function inspectGet(Request $request)
+{
+    // ป้องกันการเข้าตรงโดยไม่มี key
+    if (!$request->hasAny(['customer','fabricId','fabricStruct','fabricPattern','fabricW'])) {
+        return redirect()->route('stockfabric.index');
+    }
+
+    // reuse logic จาก inspect()
+    return $this->inspect($request);
+}
+
 }

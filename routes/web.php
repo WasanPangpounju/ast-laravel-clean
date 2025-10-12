@@ -76,7 +76,14 @@ Route::delete('/fabricimport-check/{refId}', [FabricimportController::class, 'ch
 
 Route::resource('ordershipped', OrdershippedController::class );
 
-// web.php
+// ✅ เพิ่ม GET สำหรับ reload หน้า inspect หลังลบ
+Route::get('/stockfabric-check', [StockfabricController::class, 'inspectGet'])
+    ->name('stockfabric.inspect.get');
+
+// ✅ POST สำหรับตอนกดปุ่ม "ตรวจสอบ"
+Route::post('/stockfabric-check', [StockfabricController::class, 'inspect'])
+    ->name('stockfabric.inspect');
+
 // ✅ เปลี่ยน path จาก /stockfabric/inspect → /stockfabric-check
 Route::post('/stockfabric-check', [StockfabricController::class, 'inspect'])->name('stockfabric.inspect');
 
