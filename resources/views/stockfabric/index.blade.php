@@ -165,16 +165,6 @@
     <button type="submit" class="btn_search">ตรวจสอบ</button>
 </form>
 
-                                    <!-- <form method="post" action="{{ route('fabriccheck.store') }}">
-    @csrf
-    <input type="hidden" name="customer"      value="{{ $data->customer }}">
-    <input type="hidden" name="fabricId"      value="{{ $data->fabricId }}"><!-- เพิ่ม -->
-    <input type="hidden" name="fabricStruct"  value="{{ $data->fabricStruct }}">
-    <input type="hidden" name="fabricPattern" value="{{ $data->fabricPattern }}">
-    <input type="hidden" name="fabricW"       value="{{ $data->fabricW }}">
-    <button name="submit" value="searchImport" class="btn_search">ตรวจสอบ</button>
-</form> -->
-
 </td>
 
                                 <!-- <td>
