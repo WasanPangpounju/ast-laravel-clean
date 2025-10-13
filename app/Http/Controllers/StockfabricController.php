@@ -326,6 +326,43 @@ public function destroyInBulk(Request $request)
 {
     $ids = $request->input('ids', []);
 
+    if (is_array($ids) && count($ids) > 0) {
+        // ลบตาม IDs ที่ติ๊กเลือก
+        $deleted = \DB::table('stockfabrics')->whereIn('id', $ids)->delete();
+    } else {
+        // Fallback: ไม่มี ids[] ก็ลบตามคีย์ (กรณีผู้ใช้ไม่ได้ติ๊ก)
+        $customer      = $request->input('customer');
+        $fabricId      = $request->input('fabricId');
+        $fabricStruct  = $request->input('fabricStruct');
+        $fabricPattern = $request->input('fabricPattern');
+        $fabricW       = $request->input('fabricW');
+
+        $q = \DB::table('stockfabrics');
+        if ($customer)      $q->where(\DB::raw("COALESCE(NULLIF(TRIM(customer), ''), 'AST')"), 'LIKE', '%'.trim($customer).'%');
+        if ($fabricId)      $q->where('fabricId', 'LIKE', '%'.trim($fabricId).'%');
+        if ($fabricStruct)  $q->where(\DB::raw('TRIM(fabricStruct)'), 'LIKE', '%'.trim($fabricStruct).'%');
+        if ($fabricPattern) $q->where(\DB::raw('TRIM(fabricPattern)'), 'LIKE', '%'.trim($fabricPattern).'%');
+        if ($fabricW)       $q->where(\DB::raw('TRIM(fabricW)'), 'LIKE', '%'.trim($fabricW).'%');
+
+        $deleted = $q->delete();
+    }
+
+    // กลับมาหน้า inspect พร้อมเงื่อนไขเดิม เพื่อดูผลหลังลบ
+    return redirect()
+        ->route('stockfabric.inspect.get', [
+            'customer'      => $request->input('customer'),
+            'fabricId'      => $request->input('fabricId'),
+            'fabricStruct'  => $request->input('fabricStruct'),
+            'fabricPattern' => $request->input('fabricPattern'),
+            'fabricW'       => $request->input('fabricW'),
+        ])
+        ->with('success', "ลบรายการแล้ว ($deleted แถว)");
+}
+
+public function destroyInBulk_backup1(Request $request)
+{
+    $ids = $request->input('ids', []);
+
     if (empty($ids)) {
         return redirect()->route('stockfabric.index')
             ->with('error', 'ไม่พบรายการที่จะลบ');
