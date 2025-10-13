@@ -328,7 +328,8 @@ public function destroyInBulk(Request $request)
     $deleted = 0; // กัน variable not defined
 
     $ids = $request->input('ids', []);
-
+print_r($ids );
+return;
     if (is_array($ids) && count($ids) > 0) {
         $deleted = \DB::table('stockfabrics')->whereIn('id', $ids)->delete();
     } else {
