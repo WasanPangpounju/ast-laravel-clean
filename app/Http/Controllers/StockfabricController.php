@@ -324,6 +324,7 @@ public function destroyIn($id)
 /** ลบสต็อกเข้าแบบทั้งชุด (ตามคีย์ที่เลือก) */
 public function destroyInBulk(Request $request)
 {
+        dd($request->all()); // 👈 เพิ่มตรงนี้เพื่อตรวจดูว่าฟอร์มส่งอะไรมา
     $deleted = 0; // กัน variable not defined
 
     $ids = $request->input('ids', []);
