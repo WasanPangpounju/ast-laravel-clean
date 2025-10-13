@@ -324,10 +324,9 @@ public function destroyIn($id)
 /** ลบสต็อกเข้าแบบทั้งชุด (ตามคีย์ที่เลือก) */
 public function destroyInBulk(Request $request)
 {
-        dd($request->all()); // 👈 เพิ่มตรงนี้เพื่อตรวจดูว่าฟอร์มส่งอะไรมา
     $deleted = 0; // กัน variable not defined
-alert('hi');
     $ids = $request->input('ids', []);
+        dd($ids); // ✅ หยุดการทำงานแล้วแสดงค่าออกมาในหน้าเว็บ
     if (is_array($ids) && count($ids) > 0) {
         $deleted = \DB::table('stockfabrics')->whereIn('id', $ids)->delete();
     } else {
