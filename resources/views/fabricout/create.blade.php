@@ -177,10 +177,10 @@
 
 
                                     {{-- @if(!empty($selStockStruct)) --}}
-                                    <small id="stockCurrentDisplay" class="text-muted d-block mt-1">
+{{--                                    <small id="stockCurrentDisplay" class="text-muted d-block mt-1">
   สต็อกที่เลือกปัจจุบัน: <i>ยังไม่ได้เลือก</i>
 </small>
-
+--}}
 
                                     {{-- @endif--}}
                                 </div>
